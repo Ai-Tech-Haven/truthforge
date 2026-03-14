@@ -1,0 +1,94 @@
+# Environment variables - NEVER commit these
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Testing
+.pytest_cache/
+.hypothesis/
+htmlcov/
+.coverage
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node
+node_modules/
+
+# ─── Implementation / Task-Completed / Status MD files ───────────────────────
+# Root level
+IMPLEMENTATION_SUMMARY.md
+FINAL_IMPLEMENTATION_STATUS.md
+FINAL_VERIFICATION_REPORT.md
+FINAL_CHECKLIST.md
+SETUP_COMPLETE.md
+SETUP_SUMMARY.md
+PRODUCTION_COMPLETE.md
+PRODUCTION_READY.md
+COMPLETE_INTEGRATION_FINAL.md
+INTEGRATION_COMPLETE_SUMMARY.md
+WOOCOMMERCE_FEDEX_INTEGRATION_COMPLETE.md
+WEBSOCKET_IMPLEMENTATION.md
+WEBSOCKET_COMPLETE.md
+AGENT_REGISTRATION_SUCCESS.md
+AGENT_NAMES_ALIGNMENT_REPORT.md
+ALIGNMENT_VERIFICATION_COMPLETE.md
+API_KEYS_COMPLETE.md
+API_KEYS_PORT_FILTER_IMPLEMENTATION.md
+DATABASE_SETUP_COMPLETE.md
+FRONTEND_ANALYSIS_COMPLETE.md
+FILE_INDEX.md
+
+# Frontend implementation/task md files
+truthforge_frontend/truthforge-logistics-verified-main/TYPESCRIPT_ERRORS_FIX.md
+truthforge_frontend/truthforge-logistics-verified-main/FOOTER_IMPLEMENTATION.md
+truthforge_frontend/truthforge-logistics-verified-main/TAGLINE_UPDATE.md
+truthforge_frontend/truthforge-logistics-verified-main/SPLASH_SCREEN.md
+truthforge_frontend/truthforge-logistics-verified-main/TSCONFIG_FIX.md
+truthforge_frontend/truthforge-logistics-verified-main/TESTING_CHECKLIST.md
+truthforge_frontend/truthforge-logistics-verified-main/CONTAINER_INTELLIGENCE_IMPLEMENTATION.md
+truthforge_frontend/truthforge-logistics-verified-main/VERIFICATION_FEE_WALLET_INTEGRATION.md
+truthforge_frontend/truthforge-logistics-verified-main/GLOBAL_TRADE_RISK_COMMAND_CENTER.md
+
+# ─── Root-level test files (outside tests/ folder) ───────────────────────────
+test_fedex.py
+test_woocommerce.py
+test_complete_integration.py
+test_woocommerce_fedex.py
+test_api_keys.py
+test_api_keys_integration.py
+test_production.py
+test_db_connection.py
+test_db_operations.py
+test_websocket.py
+verify_implementation.py
+check_status.py
+
+# ─── Misc ─────────────────────────────────────────────────────────────────────
+VISUAL_GUIDE.txt
+*.bat
