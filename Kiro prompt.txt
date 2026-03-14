@@ -1,0 +1,33 @@
+Create a complete Python project structure for TRUTHFORGE with the following requirements. This is the foundation - every file must be created exactly as specified.
+
+## STEP 1: Create Folder Structure
+
+Open terminal and run these commands ONE BY ONE:
+
+```bash
+# Create main project folder
+mkdir truthforge
+cd truthforge
+
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment
+# On Windows:
+venv\Scripts\activate
+# On Mac/Linux:
+source venv/bin/activate
+
+# Create all folders
+mkdir config
+mkdir hol_registry
+mkdir agents
+mkdir api
+mkdir frontend
+mkdir frontend\css
+mkdir frontend\js
+mkdir utils
+mkdir tests
+mkdir docs
+mkdir woocommerce
+mkdir woocommerce\webhooks
