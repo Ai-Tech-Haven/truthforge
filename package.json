@@ -1,0 +1,13 @@
+{
+  "name": "truthforge-topic-creator",
+  "version": "1.0.0",
+  "description": "Create Hedera topic for TruthForge",
+  "main": "create_hedera_topic.js",
+  "scripts": {
+    "register-agents": "node register-agents.js"
+  },
+  "dependencies": {
+    "@hashgraph/sdk": "2.49.2",
+    "dotenv": "16.0.0"
+  }
+}
