@@ -7,7 +7,7 @@
 Your `.env` file is already configured with PostgreSQL:
 
 ```bash
-DATABASE_URL=postgresql://postgres.svwujphciukwvwsdavqf:PHkOgTyOWwf34gi@aws-1-eu-west-1.pooler.supabase.com:5432/postgres
+DATABASE_URL=
 DB_TYPE=postgresql
 ```
 

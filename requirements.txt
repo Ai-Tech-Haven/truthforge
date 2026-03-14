@@ -1,44 +1,10 @@
-# TruthForge Dependencies
-
-# Hedera SDK for blockchain integration
-hedera-sdk-python>=2.0.0
-
-# Web framework and API
-flask>=3.0.0
-flask-cors>=4.0.0
-
-# Image processing for deepfake detection
-pillow>=10.0.0
-
-# AI and language processing
-langchain>=0.1.0
-
-# Testing frameworks
-pytest>=7.4.0
-hypothesis>=6.92.0
-
-# Database support
-sqlalchemy>=2.0.41
+flask==3.0.0
+flask-cors==4.0.0
+gunicorn==21.2.0
+python-dotenv==1.0.0
 psycopg2-binary==2.9.10
-
-# Additional dependencies
-python-dotenv>=1.0.0
-requests>=2.31.0
-woocommerce>=3.0.0
-
-# WebSocket and Real-time support
-fastapi>=0.109.0
-uvicorn[standard]>=0.27.0
-websockets>=12.0
-python-socketio>=5.11.0
-aiofiles>=23.2.1
-
-# Additional Production Dependencies
-pydantic>=2.5.0
-python-multipart>=0.0.6
-pytest-asyncio>=0.23.0
-pytest-cov>=4.1.0
-python-dateutil>=2.8.2
-pytz>=2023.3
-alembic>=1.13.0
-httpx>=0.26.0
+sqlalchemy==2.0.41
+requests==2.31.0
+hedera-sdk==2.25.0
+woocommerce==3.0.0
+cryptography==41.0.7
