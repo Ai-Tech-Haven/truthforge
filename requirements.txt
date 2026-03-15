@@ -7,3 +7,4 @@ sqlalchemy==2.0.41
 requests==2.31.0
 woocommerce==3.0.0
 cryptography==41.0.7
+Pillow==10.2.0
