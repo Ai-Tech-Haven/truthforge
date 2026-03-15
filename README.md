@@ -5,7 +5,7 @@
 <h1 align="center">TruthForge</h1>
 <p align="center"><strong>The Verifiable Intelligence Layer for Global Trade</strong></p>
 <p align="center">
-  <em>Hedera Hello Future Apex Hackathon 2026 — AI & Agentic Track + HOL Bounty</em>
+  <em>Hedera Hello Future Apex Hackathon 2026 â€” AI & Agentic Track + HOL Bounty</em>
 </p>
 
 <p align="center">
@@ -20,7 +20,7 @@
 
 ---
 
-TruthForge is a production-grade, multi-agent verification platform built on Hedera's Hashgraph Online (HOL) protocol. It delivers cryptographically anchored pre-arrival clearance for global shipments — connecting merchants, carriers, and port authorities through a unified, tamper-proof intelligence layer.
+TruthForge is a production-grade, multi-agent verification platform built on Hedera's Hashgraph Online (HOL) protocol. It delivers cryptographically anchored pre-arrival clearance for global shipments â€” connecting merchants, carriers, and port authorities through a unified, tamper-proof intelligence layer.
 
 ---
 
@@ -38,41 +38,59 @@ TruthForge is a production-grade, multi-agent verification platform built on Hed
 
 ## Live Demo
 
-- **Public Dashboard** — `/public` — Port clearance, verification, agent registry, tracking
-- **Operator Dashboard** — `/operator` — Role-based access (viewer / operator / admin)
-- **Carrier Portal** — `/public` → Carrier Portal tab — Independent document upload & pickup scheduling
-- **Mock/Live Toggle** — Switch between simulated and live Hedera data in real time
+| Layer | URL | Status |
+|---|---|---|
+| Frontend | Deployed via Vercel / Netlify | âœ… Live |
+| Backend API | Deployed on [Railway](https://railway.app) | âœ… Live |
+| Hedera Network | Testnet (account `0.0.7974354`) | âœ… Connected |
+| Database | Supabase PostgreSQL | âœ… Connected |
+
+- **Public Dashboard** â€” `/public` â€” Port clearance, verification, agent registry, tracking
+- **Operator Dashboard** â€” `/operator` â€” Role-based access (viewer / operator / admin)
+- **Carrier Portal** â€” `/public` â†’ Carrier Portal tab â€” Independent document upload & pickup scheduling
+- **Mock/Live Toggle** â€” Switch between simulated and live Hedera data in real time
+
+### Backend API Endpoints (Railway)
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/verify` | POST | Submit document/shipment verification |
+| `/api/status/<id>` | GET | Get verification status |
+| `/api/agents` | GET | List all 5 HOL-registered agents |
+| `/api/dashboard/metrics` | GET | Live operational metrics |
+| `/api/clearance/queue` | GET | Pre-arrival clearance queue |
+| `/webhook/woocommerce/order` | POST | WooCommerce order webhook (HMAC-verified) |
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    TruthForge Platform                       │
-├──────────────┬──────────────────────────────────────────────┤
-│  React/Vite  │  Public Dashboard  │  Operator Dashboard     │
-│  Frontend    │  Carrier Portal    │  Role-Based Access       │
-├──────────────┴──────────────────────────────────────────────┤
-│                    Flask REST API (Python)                    │
-│         /api/v1/*  │  WebSocket  │  WooCommerce Webhook      │
-├─────────────────────────────────────────────────────────────┤
-│              5 HOL-Registered AI Agents                      │
-│  Orchestrator │ Verification │ Carrier │ Registry │ Evidence │
-├─────────────────────────────────────────────────────────────┤
-│         Hedera Consensus Service (HCS-10 Protocol)           │
-│              Immutable Audit Trail on Testnet                │
-├──────────────────────────┬──────────────────────────────────┤
-│   WooCommerce REST API   │   FedEx Sandbox API              │
-│   a-thi.online           │   OAuth 2.0 + Shipment Creation  │
-└──────────────────────────┴──────────────────────────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚                    TruthForge Platform                       â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚  React/Vite  â”‚  Public Dashboard  â”‚  Operator Dashboard     â”‚
+â”‚  Frontend    â”‚  Carrier Portal    â”‚  Role-Based Access       â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚                    Flask REST API (Python)                    â”‚
+â”‚         /api/v1/*  â”‚  WebSocket  â”‚  WooCommerce Webhook      â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚              5 HOL-Registered AI Agents                      â”‚
+â”‚  Orchestrator â”‚ Verification â”‚ Carrier â”‚ Registry â”‚ Evidence â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚         Hedera Consensus Service (HCS-10 Protocol)           â”‚
+â”‚              Immutable Audit Trail on Testnet                â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚   WooCommerce REST API   â”‚   FedEx Sandbox API              â”‚
+â”‚   a-thi.online           â”‚   OAuth 2.0 + Shipment Creation  â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 ```
 
 ---
 
 ## The 5 HOL-Registered Agents
 
-### 1. Orchestrator Agent — `truthforge-orch-001`
+### 1. Orchestrator Agent â€” `truthforge-orch-001`
 **HCS Topic**: `0.0.8161244`
 
 The central brain. Coordinates the full order-to-clearance workflow.
@@ -91,7 +109,7 @@ orchestrator.process_order({
 
 ---
 
-### 2. Verification & Compliance Agent — `truthforge-verify-001`
+### 2. Verification & Compliance Agent â€” `truthforge-verify-001`
 **HCS Topic**: `0.0.8161247`
 
 Document intelligence and compliance enforcement.
@@ -99,12 +117,12 @@ Document intelligence and compliance enforcement.
 - Validates Bill of Lading, Commercial Invoice, Packing List
 - Runs sanctions screening and restricted party checks
 - 4-layer deepfake detection (EXIF, lighting, AI artifacts, metadata)
-- Produces confidence scores (0–100%) per document
+- Produces confidence scores (0â€“100%) per document
 - Signs verification outcomes anchored to HCS
 
 ---
 
-### 3. Carrier Adapter Agent — `truthforge-carrier-001`
+### 3. Carrier Adapter Agent â€” `truthforge-carrier-001`
 **HCS Topic**: `0.0.8161248`
 
 Council-grade carrier data ingestion and FedEx integration.
@@ -122,7 +140,7 @@ carrier.process_order_shipment(order_data)
 
 ---
 
-### 4. Registry & Discovery Agent — `truthforge-registry-001`
+### 4. Registry & Discovery Agent â€” `truthforge-registry-001`
 **HCS Topic**: `0.0.8161249`
 
 Agent health monitoring and HOL registry synchronization.
@@ -135,7 +153,7 @@ Agent health monitoring and HOL registry synchronization.
 
 ---
 
-### 5. Evidence & Settlement Agent — `truthforge-evidence-001`
+### 5. Evidence & Settlement Agent â€” `truthforge-evidence-001`
 **HCS Topic**: `0.0.8161250`
 
 Immutable proof generation and audit trail management.
@@ -152,124 +170,124 @@ Immutable proof generation and audit trail management.
 
 ```
 truthforge/
-├── agents/                          # 5 HOL-registered AI agents
-│   ├── base_agent.py                # Abstract base with HCS-10 messaging
-│   ├── orchestrator_agent.py        # Workflow coordinator
-│   ├── verification_compliance_agent.py  # Document validation + deepfake detection
-│   ├── carrier_adapter_agent.py     # FedEx + multi-carrier integration
-│   ├── registry_discovery_agent.py  # HOL registry sync
-│   ├── evidence_settlement_agent.py # HCS proof generation
-│   ├── marketplace_agent.py         # WooCommerce order management
-│   ├── fedex_client.py              # FedEx OAuth 2.0 client
-│   ├── hedera_client.py             # Hedera SDK wrapper
-│   ├── hcs10_message.py             # HCS-10 protocol messages
-│   ├── config.py                    # Centralized configuration
-│   └── error_handling.py            # Retry and error management
-│
-├── api/                             # Flask REST API
-│   ├── app.py                       # Main app + all endpoints
-│   ├── fastapi_app.py               # FastAPI alternative
-│   └── auth.py                      # API key auth + role decorators
-│
-├── database/                        # Data persistence
-│   ├── database.py                  # SQLAlchemy setup (PostgreSQL + SQLite)
-│   ├── models.py                    # ORM models
-│   ├── api_keys.py                  # API key model + roles
-│   ├── services.py                  # Business logic layer
-│   └── db_manager.py                # Connection management
-│
-├── woocommerce/webhooks/
-│   └── order_webhook.py             # HMAC-verified webhook handler
-│
-├── hol_registry/
-│   └── registry.py                  # Agent registration + discovery
-│
-├── utils/
-│   └── api_keys.py                  # Key generation, hashing, validation
-│
-├── websocket/
-│   └── routes.py                    # Real-time WebSocket updates
-│
-├── truthforge_frontend/             # React/Vite frontend
-│   └── truthforge-logistics-verified-main/
-│       └── src/
-│           ├── pages/               # 6 dashboard pages
-│           ├── components/          # UI components
-│           ├── contexts/            # Auth, MockMode, Theme, Wallet
-│           └── lib/mock-data.ts     # Mock data definitions
-│
-├── tests/                           # Full test suite (19 test files)
-├── assets/                          # Project logo and static assets
-├── .env.example                     # Configuration template
-├── requirements.txt                 # Python dependencies
-└── README.md
+â”œâ”€â”€ agents/                          # 5 HOL-registered AI agents
+â”‚   â”œâ”€â”€ base_agent.py                # Abstract base with HCS-10 messaging
+â”‚   â”œâ”€â”€ orchestrator_agent.py        # Workflow coordinator
+â”‚   â”œâ”€â”€ verification_compliance_agent.py  # Document validation + deepfake detection
+â”‚   â”œâ”€â”€ carrier_adapter_agent.py     # FedEx + multi-carrier integration
+â”‚   â”œâ”€â”€ registry_discovery_agent.py  # HOL registry sync
+â”‚   â”œâ”€â”€ evidence_settlement_agent.py # HCS proof generation
+â”‚   â”œâ”€â”€ marketplace_agent.py         # WooCommerce order management
+â”‚   â”œâ”€â”€ fedex_client.py              # FedEx OAuth 2.0 client
+â”‚   â”œâ”€â”€ hedera_client.py             # Hedera SDK wrapper
+â”‚   â”œâ”€â”€ hcs10_message.py             # HCS-10 protocol messages
+â”‚   â”œâ”€â”€ config.py                    # Centralized configuration
+â”‚   â””â”€â”€ error_handling.py            # Retry and error management
+â”‚
+â”œâ”€â”€ api/                             # Flask REST API
+â”‚   â”œâ”€â”€ app.py                       # Main app + all endpoints
+â”‚   â”œâ”€â”€ fastapi_app.py               # FastAPI alternative
+â”‚   â””â”€â”€ auth.py                      # API key auth + role decorators
+â”‚
+â”œâ”€â”€ database/                        # Data persistence
+â”‚   â”œâ”€â”€ database.py                  # SQLAlchemy setup (PostgreSQL + SQLite)
+â”‚   â”œâ”€â”€ models.py                    # ORM models
+â”‚   â”œâ”€â”€ api_keys.py                  # API key model + roles
+â”‚   â”œâ”€â”€ services.py                  # Business logic layer
+â”‚   â””â”€â”€ db_manager.py                # Connection management
+â”‚
+â”œâ”€â”€ woocommerce/webhooks/
+â”‚   â””â”€â”€ order_webhook.py             # HMAC-verified webhook handler
+â”‚
+â”œâ”€â”€ hol_registry/
+â”‚   â””â”€â”€ registry.py                  # Agent registration + discovery
+â”‚
+â”œâ”€â”€ utils/
+â”‚   â””â”€â”€ api_keys.py                  # Key generation, hashing, validation
+â”‚
+â”œâ”€â”€ websocket/
+â”‚   â””â”€â”€ routes.py                    # Real-time WebSocket updates
+â”‚
+â”œâ”€â”€ truthforge_frontend/             # React/Vite frontend
+â”‚   â””â”€â”€ truthforge-logistics-verified-main/
+â”‚       â””â”€â”€ src/
+â”‚           â”œâ”€â”€ pages/               # 6 dashboard pages
+â”‚           â”œâ”€â”€ components/          # UI components
+â”‚           â”œâ”€â”€ contexts/            # Auth, MockMode, Theme, Wallet
+â”‚           â””â”€â”€ lib/mock-data.ts     # Mock data definitions
+â”‚
+â”œâ”€â”€ tests/                           # Full test suite (19 test files)
+â”œâ”€â”€ assets/                          # Project logo and static assets
+â”œâ”€â”€ .env.example                     # Configuration template
+â”œâ”€â”€ requirements.txt                 # Python dependencies
+â””â”€â”€ README.md
 ```
 
 ---
 
 ## Implementation Progress
 
-### Backend — Complete ✅
+### Backend â€” Complete âœ…
 
 | Module | Status | Details |
 |---|---|---|
-| Project structure & config | ✅ Done | Config dataclass, env loading, validation |
-| Database layer | ✅ Done | SQLAlchemy ORM, PostgreSQL + SQLite, CRUD |
-| HCS-10 messaging protocol | ✅ Done | MessageType enum, serialization, signatures |
-| Hedera client | ✅ Done | Mock + Live modes, balance checking |
-| Base agent class | ✅ Done | HOL registration, HCS messaging, health checks |
-| HOL registry | ✅ Done | 5-agent registration, capability filtering |
-| Verification & Compliance Agent | ✅ Done | 4-layer deepfake detection, BOL validation |
-| Carrier Adapter Agent | ✅ Done | FedEx OAuth 2.0, multi-carrier normalization |
-| Registry & Discovery Agent | ✅ Done | Health monitoring, TTL caching, DISCOVER messages |
-| Evidence & Settlement Agent | ✅ Done | HCS submission, audit references, retry logic |
-| Orchestrator Agent | ✅ Done | Intent parsing, workflow coordination, aggregation |
-| Error handling & resilience | ✅ Done | Exponential backoff, retry decorators |
-| Flask REST API | ✅ Done | All endpoints, CORS, auth middleware |
-| WooCommerce webhook | ✅ Done | HMAC-verified order ingestion |
-| API key management | ✅ Done | Role-based (PORT_AUTHORITY / ENTERPRISE / ADMIN) |
-| WebSocket routes | ✅ Done | Real-time shipment updates |
+| Project structure & config | âœ… Done | Config dataclass, env loading, validation |
+| Database layer | âœ… Done | SQLAlchemy ORM, PostgreSQL + SQLite, CRUD |
+| HCS-10 messaging protocol | âœ… Done | MessageType enum, serialization, signatures |
+| Hedera client | âœ… Done | Mock + Live modes, balance checking |
+| Base agent class | âœ… Done | HOL registration, HCS messaging, health checks |
+| HOL registry | âœ… Done | 5-agent registration, capability filtering |
+| Verification & Compliance Agent | âœ… Done | 4-layer deepfake detection, BOL validation |
+| Carrier Adapter Agent | âœ… Done | FedEx OAuth 2.0, multi-carrier normalization |
+| Registry & Discovery Agent | âœ… Done | Health monitoring, TTL caching, DISCOVER messages |
+| Evidence & Settlement Agent | âœ… Done | HCS submission, audit references, retry logic |
+| Orchestrator Agent | âœ… Done | Intent parsing, workflow coordination, aggregation |
+| Error handling & resilience | âœ… Done | Exponential backoff, retry decorators |
+| Flask REST API | âœ… Done | All endpoints, CORS, auth middleware |
+| WooCommerce webhook | âœ… Done | HMAC-verified order ingestion |
+| API key management | âœ… Done | Role-based (PORT_AUTHORITY / ENTERPRISE / ADMIN) |
+| WebSocket routes | âœ… Done | Real-time shipment updates |
 
-### Frontend — Complete ✅
+### Frontend â€” Complete âœ…
 
 | Component | Status | Details |
 |---|---|---|
-| Welcome / Landing page | ✅ Done | Splash screen, tagline, product overview |
-| Public Dashboard | ✅ Done | 5 tabs — clearance, verification, carrier, agents, tracking |
-| Operator Dashboard | ✅ Done | Role-gated 6-tab dashboard |
-| Carrier Portal | ✅ Done | Document upload + FedEx pickup scheduling |
-| Agent Registry | ✅ Done | Desktop table + mobile cards, live health status |
-| Port Trust Receipt | ✅ Done | 4-step verification card with HBAR fee breakdown |
-| Pre-Arrival Clearance Queue | ✅ Done | Shipment queue with port filter |
-| Global Trade Risk Command Center | ✅ Done | Shipment map, activity feed, AI risk alerts |
-| Container Intelligence Panel | ✅ Done | Vessel trust score, container grid, verification table |
-| Verification Fee & Wallet | ✅ Done | HBAR fee settlement, wallet integration |
-| Pre-Clearance Request Modal | ✅ Done | Sea/air/land modes, cost estimation, payment flow |
-| Governance Page | ✅ Done | Admin-only governance controls |
-| Responsive design | ✅ Done | Desktop tables + mobile stacked cards |
-| Mock/Live toggle | ✅ Done | Header toggle, context-driven data switching |
-| Footer | ✅ Done | All pages, responsive 3-column layout |
-| Splash screen | ✅ Done | 2.5s animated intro with logo |
+| Welcome / Landing page | âœ… Done | Splash screen, tagline, product overview |
+| Public Dashboard | âœ… Done | 5 tabs â€” clearance, verification, carrier, agents, tracking |
+| Operator Dashboard | âœ… Done | Role-gated 6-tab dashboard |
+| Carrier Portal | âœ… Done | Document upload + FedEx pickup scheduling |
+| Agent Registry | âœ… Done | Desktop table + mobile cards, live health status |
+| Port Trust Receipt | âœ… Done | 4-step verification card with HBAR fee breakdown |
+| Pre-Arrival Clearance Queue | âœ… Done | Shipment queue with port filter |
+| Global Trade Risk Command Center | âœ… Done | Shipment map, activity feed, AI risk alerts |
+| Container Intelligence Panel | âœ… Done | Vessel trust score, container grid, verification table |
+| Verification Fee & Wallet | âœ… Done | HBAR fee settlement, wallet integration |
+| Pre-Clearance Request Modal | âœ… Done | Sea/air/land modes, cost estimation, payment flow |
+| Governance Page | âœ… Done | Admin-only governance controls |
+| Responsive design | âœ… Done | Desktop tables + mobile stacked cards |
+| Mock/Live toggle | âœ… Done | Header toggle, context-driven data switching |
+| Footer | âœ… Done | All pages, responsive 3-column layout |
+| Splash screen | âœ… Done | 2.5s animated intro with logo |
 
-### Testing — Complete ✅
+### Testing â€” Complete âœ…
 
 | Suite | Tests | Status |
 |---|---|---|
-| `tests/test_base_agent.py` | Agent registration, HCS messaging | ✅ |
-| `tests/test_config.py` | Config loading, validation | ✅ |
-| `tests/test_hcs10_message.py` | Message structure, serialization | ✅ |
-| `tests/test_hedera_client.py` | Mock/Live client, cost tracking | ✅ |
-| `tests/test_registry.py` | 5-agent registration, uniqueness | ✅ |
-| `tests/test_verification_compliance_agent.py` | Deepfake detection, BOL validation | ✅ |
-| `tests/test_fedex_adapter.py` | FedEx OAuth, shipment creation | ✅ |
-| `tests/test_orchestrator.py` | Intent parsing, workflow routing | ✅ |
-| `tests/test_orchestrator_integration.py` | End-to-end flow | ✅ |
-| `tests/test_error_handling.py` | Retry logic, backoff | ✅ |
-| `tests/test_api.py` | All REST endpoints | ✅ |
-| `tests/test_marketplace_agent.py` | WooCommerce order handling | ✅ |
-| `tests/test_woocommerce_integration.py` | Webhook HMAC verification | ✅ |
-| `tests/test_frontend_properties.py` | Responsive layout properties | ✅ |
-| **Total** | **30 tests** | **✅ All passing** |
+| `tests/test_base_agent.py` | Agent registration, HCS messaging | âœ… |
+| `tests/test_config.py` | Config loading, validation | âœ… |
+| `tests/test_hcs10_message.py` | Message structure, serialization | âœ… |
+| `tests/test_hedera_client.py` | Mock/Live client, cost tracking | âœ… |
+| `tests/test_registry.py` | 5-agent registration, uniqueness | âœ… |
+| `tests/test_verification_compliance_agent.py` | Deepfake detection, BOL validation | âœ… |
+| `tests/test_fedex_adapter.py` | FedEx OAuth, shipment creation | âœ… |
+| `tests/test_orchestrator.py` | Intent parsing, workflow routing | âœ… |
+| `tests/test_orchestrator_integration.py` | End-to-end flow | âœ… |
+| `tests/test_error_handling.py` | Retry logic, backoff | âœ… |
+| `tests/test_api.py` | All REST endpoints | âœ… |
+| `tests/test_marketplace_agent.py` | WooCommerce order handling | âœ… |
+| `tests/test_woocommerce_integration.py` | Webhook HMAC verification | âœ… |
+| `tests/test_frontend_properties.py` | Responsive layout properties | âœ… |
+| **Total** | **30 tests** | **âœ… All passing** |
 
 ---
 
@@ -357,19 +375,19 @@ node register-agents.js
 
 ```
 WooCommerce Order Created
-        │
-        ▼
-Webhook → OrchestratorAgent.process_order()
-        │
-        ├─► MarketplaceAgent.get_order_details()
-        │
-        ├─► CarrierAdapterAgent.process_order_shipment()
-        │         └─► FedExClient.create_shipment()
-        │
-        ├─► VerificationComplianceAgent (document checks)
-        │
-        └─► EvidenceSettlementAgent.submit_to_hcs()
-                  └─► Port Trust Receipt issued
+        â”‚
+        â–¼
+Webhook â†’ OrchestratorAgent.process_order()
+        â”‚
+        â”œâ”€â–º MarketplaceAgent.get_order_details()
+        â”‚
+        â”œâ”€â–º CarrierAdapterAgent.process_order_shipment()
+        â”‚         â””â”€â–º FedExClient.create_shipment()
+        â”‚
+        â”œâ”€â–º VerificationComplianceAgent (document checks)
+        â”‚
+        â””â”€â–º EvidenceSettlementAgent.submit_to_hcs()
+                  â””â”€â–º Port Trust Receipt issued
                         (HBAR fee settled on Hedera)
 ```
 
@@ -380,7 +398,7 @@ Webhook → OrchestratorAgent.process_order()
 - **Network**: Testnet (`0.0.7974354`)
 - **Protocol**: HCS-10 for agent messaging
 - **Topics**: 5 dedicated HCS topics (one per agent)
-- **Fees**: ~0.01–0.24 HBAR per verification
+- **Fees**: ~0.01â€“0.24 HBAR per verification
 - **HOL Registry**: All 5 agents registered with UAIDs
 
 ---
@@ -411,9 +429,9 @@ DATABASE_URL=postgresql://...
 
 ## Hackathon Tracks
 
-- **AI & Agentic Track** — 5 autonomous HOL-registered agents with HCS-10 messaging
-- **HOL Bounty** — Full HOL agent registration, discovery, and consensus anchoring
-- **Real-World Impact** — Live WooCommerce store integration (`a-thi.online`)
+- **AI & Agentic Track** â€” 5 autonomous HOL-registered agents with HCS-10 messaging
+- **HOL Bounty** â€” Full HOL agent registration, discovery, and consensus anchoring
+- **Real-World Impact** â€” Live WooCommerce store integration (`a-thi.online`)
 
 ---
 
