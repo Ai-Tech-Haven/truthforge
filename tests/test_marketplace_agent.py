@@ -1063,3 +1063,4 @@ class TestIntegration:
         
         assert status.agent_id == "truthforge-market-001"
         assert status.status in ["ONLINE", "OFFLINE"]
+
