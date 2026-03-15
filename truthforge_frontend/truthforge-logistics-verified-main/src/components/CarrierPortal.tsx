@@ -3,6 +3,7 @@ import { useMockMode } from "@/contexts/MockModeContext";
 import { Package, Upload, CheckCircle, Clock, AlertTriangle, FileText, Truck, RefreshCw, X, CalendarCheck } from "lucide-react";
 import { mockCarrierVerifications, CarrierVerification } from "@/lib/mock-data";
 import { useToast } from "@/hooks/use-toast";
+import { API_BASE } from "@/lib/api-client";
 
 const ACCEPTED_DOC_TYPES = [
   { value: "bill_of_lading", label: "Bill of Lading" },
@@ -78,7 +79,7 @@ const CarrierPortal = () => {
       setSubmitResult({ ...mock, carrierName, documents: uploadedDocs });
     } else {
       try {
-        const res = await fetch("/api/v1/carrier/verify", {
+        const res = await fetch(`${API_BASE}/api/v1/carrier/verify`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ carrierName, shipmentId, documents: uploadedDocs }),
@@ -136,7 +137,7 @@ const CarrierPortal = () => {
         <div className={`inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded border text-[10px] font-heading font-bold uppercase tracking-wider ${
           isMockMode ? "border-warning/40 bg-warning/10 text-warning" : "border-success/40 bg-success/10 text-success"
         }`}>
-          {isMockMode ? "Mock Mode — Simulated Responses" : "Live Mode — Connected to Backend"}
+          {isMockMode ? "Mock Mode â€” Simulated Responses" : "Live Mode â€” Connected to Backend"}
         </div>
       </div>
 
@@ -145,7 +146,7 @@ const CarrierPortal = () => {
         <>
           <VerificationResult result={submitResult} onReset={handleReset} />
 
-          {/* Pickup Scheduling — only show after verified status */}
+          {/* Pickup Scheduling â€” only show after verified status */}
           {submitResult.status === "verified" && pickupStatus === "none" && (
             <div className="rounded-lg border border-accent/30 bg-accent/5 p-5 space-y-3">
               <div className="flex items-center gap-2">
@@ -184,11 +185,11 @@ const CarrierPortal = () => {
             </div>
           )}
 
-          {/* Show pickup option for pending too — but with different message */}
+          {/* Show pickup option for pending too â€” but with different message */}
           {submitResult.status === "pending" && pickupStatus === "none" && (
             <div className="rounded-lg border border-warning/30 bg-warning/5 p-4">
               <p className="text-xs text-warning font-medium">
-                Verification pending — pickup scheduling will be available once verification is confirmed.
+                Verification pending â€” pickup scheduling will be available once verification is confirmed.
               </p>
             </div>
           )}
