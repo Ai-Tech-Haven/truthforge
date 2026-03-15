@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Shield, Eye, Lock } from 'lucide-react';
+import { Eye, Lock } from 'lucide-react';
 import Footer from '@/components/Footer';
+import logo from '@/assets/truthforge-logo.png';
 
 const WelcomePage = () => {
   const navigate = useNavigate();
@@ -14,7 +15,7 @@ const WelcomePage = () => {
           {/* Logo and Title */}
           <div className="text-center space-y-4">
             <div className="flex justify-center">
-              <Shield className="h-16 w-16 text-primary" />
+              <img src={logo} alt="TruthForge" className="h-20 w-20 object-contain" />
             </div>
             <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
               TruthForge

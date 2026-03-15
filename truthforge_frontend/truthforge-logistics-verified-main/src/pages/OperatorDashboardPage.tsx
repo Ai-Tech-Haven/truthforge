@@ -16,6 +16,7 @@ import { WalletProvider } from '@/contexts/WalletContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { LogOut, Shield } from 'lucide-react';
+import logo from '@/assets/truthforge-logo.png';
 
 const pages: Record<string, React.FC> = {
   dashboard: DashboardPage,
@@ -66,7 +67,7 @@ const OperatorDashboardPage = () => {
             <div className="border-b bg-muted/50">
               <div className="container flex items-center justify-between py-2">
                 <div className="flex items-center gap-3">
-                  <Shield className="h-5 w-5 text-primary" />
+                  <img src={logo} alt="TruthForge" className="h-5 w-5 object-contain" />
                   <span className="text-sm font-medium">Operator Dashboard</span>
                   <Badge variant={getRoleBadgeVariant()}>
                     {user.role.toUpperCase()}

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Shield } from 'lucide-react';
+import logo from '@/assets/truthforge-logo.png';
 
 const Footer = () => {
   return (
@@ -10,7 +10,7 @@ const Footer = () => {
           {/* Left Section - Brand */}
           <div className="space-y-4">
             <div className="flex items-center gap-2">
-              <Shield className="h-6 w-6 text-[hsl(190,100%,50%)]" />
+              <img src={logo} alt="TruthForge" className="h-7 w-7 object-contain" />
               <span className="text-xl font-heading font-bold text-[hsl(210,20%,90%)]">
                 TruthForge
               </span>
