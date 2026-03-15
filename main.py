@@ -397,5 +397,22 @@ def main():
         system.stop()
 
 
+def create_wsgi_app():
+    """
+    Create and return the WSGI app for gunicorn.
+    Boots the full TruthForge system and returns the Flask app.
+    """
+    system = TruthForgeSystem()
+    if not system.initialize():
+        logger.error("TruthForge system failed to initialize â€” exiting")
+        sys.exit(1)
+    system.running = True
+    return system.flask_app
+
+
+# Module-level app for gunicorn: `gunicorn main:app`
+app = create_wsgi_app()
+
+
 if __name__ == "__main__":
     main()
