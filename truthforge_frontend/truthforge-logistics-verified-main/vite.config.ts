@@ -10,6 +10,17 @@ export default defineConfig({
     hmr: {
       overlay: false,
     },
+    // Proxy API calls to backend in local dev (production uses VITE_API_URL)
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+      '/webhook': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+    },
   },
   plugins: [react()],
   resolve: {
