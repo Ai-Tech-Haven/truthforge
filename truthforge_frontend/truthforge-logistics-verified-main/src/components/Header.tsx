@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Switch } from "@/components/ui/switch";
 import { useMockMode } from "@/contexts/MockModeContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useWallet } from "@/contexts/WalletContext";
+import { apiFetch, MockModeError } from "@/lib/api-client";
 import logo from "@/assets/truthforge-logo.png";
 import {
   Database, Sun, Moon, ChevronDown, Wallet, Anchor, BarChart3,
@@ -242,6 +243,27 @@ const Header = () => {
   const navigate = useNavigate();
   const [helpOpen, setHelpOpen] = useState(false);
 
+  // Live integration badge state
+  const [wcConnected, setWcConnected] = useState(true);
+  const [fedexConnected, setFedexConnected] = useState(true);
+
+  const fetchBadges = useCallback(async () => {
+    if (isMockMode) { setWcConnected(true); setFedexConnected(true); return; }
+    try {
+      const data = await apiFetch<{ woocommerce: { connected: boolean }; fedex: { connected: boolean } }>(
+        "/api/integrations/status"
+      );
+      setWcConnected(data.woocommerce.connected);
+      setFedexConnected(data.fedex.connected);
+    } catch (err) {
+      if (!(err instanceof MockModeError)) {
+        // keep previous state on error
+      }
+    }
+  }, [isMockMode]);
+
+  useEffect(() => { fetchBadges(); }, [fetchBadges]);
+
   const portalItems: DropdownItem[] = [
     { path: "/merchant", label: "Merchant Portal", icon: Package },
     { path: "/carrier", label: "Carrier Portal", icon: Ship },
@@ -262,8 +284,20 @@ const Header = () => {
   ];
 
   const integrationItems: DropdownItem[] = [
-    { path: "/integrations/woocommerce", label: "WooCommerce", icon: Plug, badge: "Connected", badgeColor: "border-success/40 text-success" },
-    { path: "/integrations/fedex", label: "FedEx", icon: Package, badge: "Connected", badgeColor: "border-success/40 text-success" },
+    {
+      path: "/integrations/woocommerce",
+      label: "WooCommerce",
+      icon: Plug,
+      badge: wcConnected ? "Connected" : "Disconnected",
+      badgeColor: wcConnected ? "border-success/40 text-success" : "border-destructive/40 text-destructive",
+    },
+    {
+      path: "/integrations/fedex",
+      label: "FedEx",
+      icon: Package,
+      badge: fedexConnected ? "Connected" : "Disconnected",
+      badgeColor: fedexConnected ? "border-success/40 text-success" : "border-destructive/40 text-destructive",
+    },
     { path: "/settings", label: "Settings & Docs", icon: Building2 },
   ];
 

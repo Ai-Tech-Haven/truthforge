@@ -1112,6 +1112,102 @@ def register_routes(app: Flask) -> None:
                 {"error_type": type(e).__name__}
             )
     
+    # ─── Integration State (in-memory store, replace with DB in production) ──────
+    _integration_state: Dict[str, Any] = {
+        "hedera": {"connected": True, "detail": "Testnet — HCS Topics Active"},
+        "carrier_council": {"connected": True, "detail": "Council-grade data adapters enabled"},
+        "woocommerce": {"connected": True, "detail": "REST API — a-thi.online"},
+        "fedex": {"connected": True, "detail": "FedEx Ship API"},
+        "webhooks": {
+            "merchant_url": "",
+            "carrier_url": "",
+            "port_authority_url": "",
+        },
+    }
+
+    @app.route('/api/integrations/status', methods=['GET'])
+    def get_integrations_status():
+        """GET /api/integrations/status — Return live integration states"""
+        return jsonify({
+            "hedera": _integration_state["hedera"],
+            "carrier_council": _integration_state["carrier_council"],
+            "woocommerce": _integration_state["woocommerce"],
+            "fedex": _integration_state["fedex"],
+            "webhooks": _integration_state["webhooks"],
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }), 200
+
+    @app.route('/api/integrations/hedera/connect', methods=['POST'])
+    def hedera_connect():
+        _integration_state["hedera"]["connected"] = True
+        _integration_state["hedera"]["detail"] = "Testnet — HCS Topics Active"
+        logger.info("Hedera connected")
+        return jsonify({"success": True, "state": _integration_state["hedera"]}), 200
+
+    @app.route('/api/integrations/hedera/disconnect', methods=['POST'])
+    def hedera_disconnect():
+        _integration_state["hedera"]["connected"] = False
+        _integration_state["hedera"]["detail"] = "Disconnected"
+        logger.info("Hedera disconnected")
+        return jsonify({"success": True, "state": _integration_state["hedera"]}), 200
+
+    @app.route('/api/integrations/carrier-council/connect', methods=['POST'])
+    def carrier_council_connect():
+        _integration_state["carrier_council"]["connected"] = True
+        _integration_state["carrier_council"]["detail"] = "Council-grade data adapters enabled"
+        logger.info("Carrier Council connected")
+        return jsonify({"success": True, "state": _integration_state["carrier_council"]}), 200
+
+    @app.route('/api/integrations/carrier-council/disconnect', methods=['POST'])
+    def carrier_council_disconnect():
+        _integration_state["carrier_council"]["connected"] = False
+        _integration_state["carrier_council"]["detail"] = "Disconnected"
+        logger.info("Carrier Council disconnected")
+        return jsonify({"success": True, "state": _integration_state["carrier_council"]}), 200
+
+    @app.route('/api/integrations/woocommerce/connect', methods=['POST'])
+    def woocommerce_connect():
+        _integration_state["woocommerce"]["connected"] = True
+        _integration_state["woocommerce"]["detail"] = "REST API — a-thi.online"
+        logger.info("WooCommerce connected")
+        return jsonify({"success": True, "state": _integration_state["woocommerce"]}), 200
+
+    @app.route('/api/integrations/woocommerce/disconnect', methods=['POST'])
+    def woocommerce_disconnect():
+        _integration_state["woocommerce"]["connected"] = False
+        _integration_state["woocommerce"]["detail"] = "Disconnected"
+        logger.info("WooCommerce disconnected")
+        return jsonify({"success": True, "state": _integration_state["woocommerce"]}), 200
+
+    @app.route('/api/integrations/fedex/connect', methods=['POST'])
+    def fedex_connect():
+        _integration_state["fedex"]["connected"] = True
+        _integration_state["fedex"]["detail"] = "FedEx Ship API"
+        logger.info("FedEx connected")
+        return jsonify({"success": True, "state": _integration_state["fedex"]}), 200
+
+    @app.route('/api/integrations/fedex/disconnect', methods=['POST'])
+    def fedex_disconnect():
+        _integration_state["fedex"]["connected"] = False
+        _integration_state["fedex"]["detail"] = "Disconnected"
+        logger.info("FedEx disconnected")
+        return jsonify({"success": True, "state": _integration_state["fedex"]}), 200
+
+    @app.route('/api/integrations/webhook/configure', methods=['POST'])
+    def configure_webhooks():
+        """POST /api/integrations/webhook/configure — Save webhook URLs"""
+        data = request.get_json(silent=True) or {}
+        if "merchant_url" in data:
+            _integration_state["webhooks"]["merchant_url"] = data["merchant_url"]
+        if "carrier_url" in data:
+            _integration_state["webhooks"]["carrier_url"] = data["carrier_url"]
+        if "port_authority_url" in data:
+            _integration_state["webhooks"]["port_authority_url"] = data["port_authority_url"]
+        logger.info(f"Webhook URLs updated: {_integration_state['webhooks']}")
+        return jsonify({"success": True, "webhooks": _integration_state["webhooks"]}), 200
+
+    # ─────────────────────────────────────────────────────────────────────────────
+
     @app.route('/api/v1/proof/<shipment_id>', methods=['GET'])
     def get_shipment_proof(shipment_id: str):
         """
