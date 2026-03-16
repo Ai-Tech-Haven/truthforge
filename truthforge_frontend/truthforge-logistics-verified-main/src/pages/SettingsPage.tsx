@@ -136,21 +136,37 @@ const SettingsPage = () => {
   const [savingWebhook, setSavingWebhook] = useState(false);
 
   // ── Fetch integration status from backend (live mode only) ──────────────────
+  // forceLive=true bypasses the localStorage mock-mode check in apiFetch.
+  // This is needed because localStorage is written asynchronously after React
+  // state updates, so it may still say "true" when we first switch to live mode.
   const fetchStatus = useCallback(async () => {
     if (isMockMode) return;
+    setFetchError(false);
     try {
-      const data = await apiFetch<IntegrationsStatus>("/api/integrations/status");
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000); // 8s hard timeout
+      const data = await apiFetch<IntegrationsStatus>(
+        "/api/integrations/status",
+        { signal: controller.signal },
+        true // forceLive — skip localStorage check
+      );
+      clearTimeout(timeout);
       setStatus(data);
       setMerchantUrl(data.webhooks.merchant_url || "");
       setCarrierUrl(data.webhooks.carrier_url || "");
       setPortUrl(data.webhooks.port_authority_url || "");
-      setFetchError(false);
     } catch (err) {
-      if (!(err instanceof MockModeError)) setFetchError(true);
+      if (err instanceof MockModeError) return; // shouldn't happen with forceLive
+      setFetchError(true);
     }
   }, [isMockMode]);
 
   useEffect(() => {
+    if (!isMockMode) {
+      // Reset stale state so loading spinner shows immediately on mode switch
+      setStatus(null);
+      setFetchError(false);
+    }
     fetchStatus();
   }, [fetchStatus]);
 
@@ -158,7 +174,7 @@ const SettingsPage = () => {
   const toggle = async (key: string, action: "connect" | "disconnect") => {
     setLoadingKey(key);
     try {
-      await apiFetch(`/api/integrations/${key}/${action}`, { method: "POST" });
+      await apiFetch(`/api/integrations/${key}/${action}`, { method: "POST" }, true);
       await fetchStatus();
     } catch {
       // silently fail — status will stay as-is
@@ -178,7 +194,7 @@ const SettingsPage = () => {
       await apiFetch("/api/integrations/webhook/configure", {
         method: "POST",
         body: JSON.stringify(payload),
-      });
+      }, true);
       await fetchStatus();
     } catch {
       // silently fail
