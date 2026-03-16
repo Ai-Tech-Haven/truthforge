@@ -26,6 +26,7 @@ const pages: Record<string, ComponentType> = {
   agents: AgentsPage,
   tracking: TrackingPage,
   settings: SettingsPage,
+  help: SettingsPage,
   // integration dropdown items all resolve to SettingsPage
   "integration-woocommerce": SettingsPage,
   "integration-fedex": SettingsPage,

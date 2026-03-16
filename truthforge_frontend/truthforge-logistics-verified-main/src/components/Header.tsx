@@ -35,19 +35,37 @@ interface DropdownMenuProps {
 const DropdownMenu = ({ label, icon: Icon, items, activeTab, onSelect }: DropdownMenuProps) => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleMouseEnter = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    setOpen(true);
+  };
+
+  const handleMouseLeave = () => {
+    closeTimer.current = setTimeout(() => setOpen(false), 80);
+  };
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      if (closeTimer.current) clearTimeout(closeTimer.current);
+    };
   }, []);
 
   const isActive = items.some(i => i.id === activeTab);
 
   return (
-    <div className="relative" ref={ref}>
+    <div
+      className="relative"
+      ref={ref}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
       <button
         onClick={() => setOpen(o => !o)}
         className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded transition-colors whitespace-nowrap ${
@@ -62,7 +80,11 @@ const DropdownMenu = ({ label, icon: Icon, items, activeTab, onSelect }: Dropdow
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 min-w-[180px] rounded-lg border border-border bg-card shadow-elevated z-50 py-1">
+        <div
+          className="absolute top-full left-0 mt-1 min-w-[180px] rounded-lg border border-border bg-card shadow-elevated z-50 py-1"
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        >
           {items.map(item => {
             const ItemIcon = item.icon;
             return (
@@ -174,6 +196,7 @@ const Header = ({ activeTab, onTabChange, portalRole }: HeaderProps) => {
   const dashboardItems: DropdownItem[] = [
     { id: "tracking", label: "Operational Oversight", icon: BarChart3 },
     { id: "dashboard", label: "Analytics", icon: BarChart3 },
+    { id: "verification", label: "Verification", icon: FileText },
     { id: "reports", label: "Reports", icon: FileText, disabled: true, badge: "Soon", badgeColor: "border-muted text-muted-foreground" },
   ];
 
