@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import truthforgeLogo from '@/assets/truthforge-logo.png';
+import { useEffect, useState } from "react";
+import truthforgeLogo from "@/assets/truthforge-logo.png";
 
 interface SplashScreenProps {
   onLoadingComplete: () => void;
@@ -7,26 +7,21 @@ interface SplashScreenProps {
 }
 
 const SplashScreen = ({ onLoadingComplete, minDisplayTime = 2000 }: SplashScreenProps) => {
-  // isMounted controls whether the DOM node exists
-  // isVisible controls the opacity (for CSS fade-out transition)
-  const [isMounted, setIsMounted] = useState(true);
   const [isVisible, setIsVisible] = useState(true);
+  const [isMounted, setIsMounted] = useState(true);
 
   useEffect(() => {
-    // After minDisplayTime, start fade-out
-    const fadeTimer = setTimeout(() => {
-      setIsVisible(false);
-    }, minDisplayTime);
-
-    // After fade-out completes (500ms), unmount and notify parent
-    const unmountTimer = setTimeout(() => {
+    // Start fade-out after minDisplayTime
+    const fadeTimer = setTimeout(() => setIsVisible(false), minDisplayTime);
+    // Unmount + notify parent after fade completes (500ms transition)
+    const doneTimer = setTimeout(() => {
       setIsMounted(false);
       onLoadingComplete();
     }, minDisplayTime + 500);
 
     return () => {
       clearTimeout(fadeTimer);
-      clearTimeout(unmountTimer);
+      clearTimeout(doneTimer);
     };
   }, [onLoadingComplete, minDisplayTime]);
 
@@ -34,11 +29,10 @@ const SplashScreen = ({ onLoadingComplete, minDisplayTime = 2000 }: SplashScreen
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-hero transition-opacity duration-500"
-      style={{ opacity: isVisible ? 1 : 0, pointerEvents: isVisible ? 'auto' : 'none' }}
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-hero transition-opacity duration-500"
+      style={{ opacity: isVisible ? 1 : 0, pointerEvents: isVisible ? "auto" : "none" }}
     >
       <div className="flex flex-col items-center justify-center space-y-6">
-        {/* Logo with zoom-out animation */}
         <div className="animate-zoom-out-splash">
           <img
             src={truthforgeLogo}
@@ -46,16 +40,14 @@ const SplashScreen = ({ onLoadingComplete, minDisplayTime = 2000 }: SplashScreen
             className="w-48 h-48 md:w-64 md:h-64 object-contain drop-shadow-2xl"
           />
         </div>
-
-        {/* Loading text */}
-        <div className="animate-fade-in-up">
-          <p className="text-teal text-sm md:text-base font-medium tracking-wide text-center">
+        <div className="animate-fade-in-up text-center">
+          <p className="text-teal text-sm md:text-base font-medium tracking-wide">
             Initializing Verification Network...
           </p>
           <div className="flex justify-center space-x-1 mt-4">
-            <div className="w-2 h-2 bg-teal rounded-full animate-bounce-dot" style={{ animationDelay: '0ms' }}></div>
-            <div className="w-2 h-2 bg-teal rounded-full animate-bounce-dot" style={{ animationDelay: '150ms' }}></div>
-            <div className="w-2 h-2 bg-teal rounded-full animate-bounce-dot" style={{ animationDelay: '300ms' }}></div>
+            <div className="w-2 h-2 bg-teal rounded-full animate-bounce-dot" style={{ animationDelay: "0ms" }} />
+            <div className="w-2 h-2 bg-teal rounded-full animate-bounce-dot" style={{ animationDelay: "150ms" }} />
+            <div className="w-2 h-2 bg-teal rounded-full animate-bounce-dot" style={{ animationDelay: "300ms" }} />
           </div>
         </div>
       </div>

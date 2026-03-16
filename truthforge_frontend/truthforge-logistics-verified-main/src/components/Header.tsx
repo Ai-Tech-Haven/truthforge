@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Switch } from "@/components/ui/switch";
 import { useMockMode } from "@/contexts/MockModeContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -6,17 +7,14 @@ import { useWallet } from "@/contexts/WalletContext";
 import logo from "@/assets/truthforge-logo.png";
 import {
   Database, Sun, Moon, ChevronDown, Wallet, Anchor, BarChart3,
-  FileText, Cpu, Plug, HelpCircle, LogOut, Building2, Package, Ship
+  FileText, Cpu, Plug, HelpCircle, LogOut, Building2, Package,
+  Ship, X, BookOpen, Code, MessageSquare,
 } from "lucide-react";
 
-interface HeaderProps {
-  activeTab: string;
-  onTabChange: (tab: string) => void;
-  portalRole?: "merchant" | "carrier" | "port-authority" | null;
-}
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface DropdownItem {
-  id: string;
+  path?: string;
   label: string;
   icon?: React.ElementType;
   badge?: string;
@@ -28,11 +26,13 @@ interface DropdownMenuProps {
   label: string;
   icon?: React.ElementType;
   items: DropdownItem[];
-  activeTab: string;
-  onSelect: (id: string) => void;
 }
 
-const DropdownMenu = ({ label, icon: Icon, items, activeTab, onSelect }: DropdownMenuProps) => {
+// ─── Dropdown ────────────────────────────────────────────────────────────────
+
+const DropdownMenu = ({ label, icon: Icon, items }: DropdownMenuProps) => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -43,7 +43,7 @@ const DropdownMenu = ({ label, icon: Icon, items, activeTab, onSelect }: Dropdow
   };
 
   const handleMouseLeave = () => {
-    closeTimer.current = setTimeout(() => setOpen(false), 80);
+    closeTimer.current = setTimeout(() => setOpen(false), 100);
   };
 
   useEffect(() => {
@@ -57,7 +57,7 @@ const DropdownMenu = ({ label, icon: Icon, items, activeTab, onSelect }: Dropdow
     };
   }, []);
 
-  const isActive = items.some(i => i.id === activeTab);
+  const isActive = items.some(i => i.path && location.pathname === i.path);
 
   return (
     <div
@@ -68,49 +68,50 @@ const DropdownMenu = ({ label, icon: Icon, items, activeTab, onSelect }: Dropdow
     >
       <button
         onClick={() => setOpen(o => !o)}
-        className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded transition-colors whitespace-nowrap ${
+        className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium uppercase tracking-wide rounded transition-colors whitespace-nowrap ${
           isActive
             ? "bg-primary text-primary-foreground"
             : "text-muted-foreground hover:text-foreground hover:bg-secondary"
         }`}
       >
-        {Icon && <Icon className="h-3.5 w-3.5" />}
-        <span className="hidden lg:inline">{label}</span>
-        <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} />
+        {Icon && <Icon className="h-4 w-4" />}
+        <span>{label}</span>
+        <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
 
       {open && (
         <div
-          className="absolute top-full left-0 mt-1 min-w-[180px] rounded-lg border border-border bg-card shadow-elevated z-50 py-1"
+          className="absolute top-full left-0 mt-1 min-w-[200px] rounded-lg border border-border bg-card shadow-elevated z-[100] py-1"
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
           {items.map(item => {
             const ItemIcon = item.icon;
+            const isItemActive = item.path ? location.pathname === item.path : false;
             return (
               <button
-                key={item.id}
+                key={item.label}
                 disabled={item.disabled}
                 onClick={() => {
-                  if (!item.disabled) {
-                    onSelect(item.id);
+                  if (!item.disabled && item.path) {
+                    navigate(item.path);
                     setOpen(false);
                   }
                 }}
-                className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-xs transition-colors ${
+                className={`w-full flex items-center justify-between gap-2 px-4 py-2.5 text-sm transition-colors ${
                   item.disabled
                     ? "text-muted-foreground/40 cursor-not-allowed"
-                    : activeTab === item.id
+                    : isItemActive
                     ? "bg-primary/10 text-primary font-medium"
-                    : "text-foreground hover:bg-secondary"
+                    : "text-foreground hover:bg-white/5"
                 }`}
               >
-                <span className="flex items-center gap-2">
-                  {ItemIcon && <ItemIcon className="h-3.5 w-3.5 shrink-0" />}
+                <span className="flex items-center gap-2.5">
+                  {ItemIcon && <ItemIcon className="h-4 w-4 shrink-0" />}
                   {item.label}
                 </span>
                 {item.badge && (
-                  <span className={`text-[9px] font-heading font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${item.badgeColor || "border-border text-muted-foreground"}`}>
+                  <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${item.badgeColor || "border-border text-muted-foreground"}`}>
                     {item.badge}
                   </span>
                 )}
@@ -123,14 +124,60 @@ const DropdownMenu = ({ label, icon: Icon, items, activeTab, onSelect }: Dropdow
   );
 };
 
-const WalletStatus = ({ portalRole }: { portalRole?: "merchant" | "carrier" | "port-authority" | null }) => {
+// ─── Help Modal ───────────────────────────────────────────────────────────────
+
+const HelpModal = ({ onClose }: { onClose: () => void }) => (
+  <div
+    className="fixed inset-0 z-[200] bg-black/60 flex items-center justify-center p-4"
+    onClick={onClose}
+  >
+    <div
+      className="bg-card border border-border rounded-xl p-6 max-w-md w-full shadow-elevated"
+      onClick={e => e.stopPropagation()}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-heading font-bold text-foreground flex items-center gap-2">
+          <HelpCircle className="h-4 w-4 text-accent" />
+          Help &amp; Documentation
+        </h3>
+        <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="space-y-3">
+        {[
+          { icon: BookOpen, label: "REST API Reference", desc: "Full API docs for backend integration" },
+          { icon: Code, label: "Agent SDK Guide", desc: "Build and register custom agents" },
+          { icon: Database, label: "HCS Data Schema", desc: "Hedera Consensus Service message formats" },
+          { icon: MessageSquare, label: "Support Chat", desc: "Talk to the TruthForge team" },
+        ].map(item => (
+          <div key={item.label} className="flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-secondary/50 transition-colors cursor-pointer">
+            <item.icon className="h-4 w-4 text-accent mt-0.5 shrink-0" />
+            <div>
+              <div className="text-sm font-medium text-foreground">{item.label}</div>
+              <div className="text-xs text-muted-foreground">{item.desc}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+// ─── Wallet Status ────────────────────────────────────────────────────────────
+
+const WalletStatus = () => {
   const { wallet, isWalletConnected, connectWallet, disconnectWallet } = useWallet();
+  const location = useLocation();
   const [hover, setHover] = useState(false);
   const [connecting, setConnecting] = useState(false);
 
-  if (!portalRole || portalRole === "port-authority") return null;
+  // Only show on portal pages
+  const isPortalPage = ["/merchant", "/carrier", "/port-authority"].includes(location.pathname);
+  const isPortAuthority = location.pathname === "/port-authority";
+  if (!isPortalPage || isPortAuthority) return null;
 
-  const roleLabel = portalRole === "merchant" ? "Merchant" : "Carrier";
+  const roleLabel = location.pathname === "/merchant" ? "Merchant" : "Carrier";
 
   const handleConnect = async () => {
     setConnecting(true);
@@ -143,7 +190,7 @@ const WalletStatus = ({ portalRole }: { portalRole?: "merchant" | "carrier" | "p
       <button
         onClick={handleConnect}
         disabled={connecting}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-accent/40 bg-accent/10 text-accent text-xs font-heading font-bold uppercase tracking-wider hover:bg-accent/20 transition-colors disabled:opacity-50"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-accent/40 bg-accent/10 text-accent text-xs font-bold uppercase tracking-wider hover:bg-accent/20 transition-colors disabled:opacity-50"
       >
         <Wallet className="h-3.5 w-3.5" />
         <span className="hidden sm:inline">{connecting ? "Connecting..." : "Connect Wallet"}</span>
@@ -157,16 +204,15 @@ const WalletStatus = ({ portalRole }: { portalRole?: "merchant" | "carrier" | "p
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-success/40 bg-success/10 text-success text-xs font-heading font-bold cursor-pointer">
+      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-success/40 bg-success/10 text-success text-xs font-bold cursor-pointer">
         <Wallet className="h-3.5 w-3.5" />
-        <span className="hidden sm:inline">Wallet Connected – {wallet?.address}</span>
+        <span className="hidden sm:inline">Wallet — {wallet?.address}</span>
       </div>
-
       {hover && (
-        <div className="absolute top-full right-0 mt-1 w-56 rounded-lg border border-border bg-card shadow-elevated z-50 p-3 space-y-2">
+        <div className="absolute top-full right-0 mt-1 w-56 rounded-lg border border-border bg-card shadow-elevated z-[100] p-3 space-y-2">
           <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Network</div>
           <div className="text-xs text-foreground font-medium">Hedera Testnet</div>
-          <div className="text-[10px] text-muted-foreground uppercase tracking-wider mt-2">Role Context</div>
+          <div className="text-[10px] text-muted-foreground uppercase tracking-wider mt-2">Role</div>
           <div className="text-xs text-foreground font-medium">{roleLabel}</div>
           <div className="text-[10px] text-muted-foreground uppercase tracking-wider mt-2">Account</div>
           <div className="text-xs font-mono text-accent">{wallet?.address}</div>
@@ -183,95 +229,109 @@ const WalletStatus = ({ portalRole }: { portalRole?: "merchant" | "carrier" | "p
   );
 };
 
-const Header = ({ activeTab, onTabChange, portalRole }: HeaderProps) => {
+// ─── Header ───────────────────────────────────────────────────────────────────
+
+const Header = () => {
   const { isMockMode, toggleMockMode } = useMockMode();
   const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const portalItems: DropdownItem[] = [
-    { id: "portal-merchant", label: "Merchant Portal", icon: Package },
-    { id: "portal-carrier", label: "Carrier Portal", icon: Ship },
-    { id: "portal-port-authority", label: "Port Authority Portal", icon: Anchor },
+    { path: "/merchant", label: "Merchant Portal", icon: Package },
+    { path: "/carrier", label: "Carrier Portal", icon: Ship },
+    { path: "/port-authority", label: "Port Authority Portal", icon: Anchor },
   ];
 
   const dashboardItems: DropdownItem[] = [
-    { id: "tracking", label: "Operational Oversight", icon: BarChart3 },
-    { id: "dashboard", label: "Analytics", icon: BarChart3 },
-    { id: "verification", label: "Verification", icon: FileText },
-    { id: "reports", label: "Reports", icon: FileText, disabled: true, badge: "Soon", badgeColor: "border-muted text-muted-foreground" },
+    { path: "/tracking", label: "Operational Oversight", icon: BarChart3 },
+    { path: "/dashboard", label: "Analytics", icon: BarChart3 },
+    { path: "/verification", label: "Verification", icon: FileText },
+    { path: "/reports", label: "Reports", icon: FileText, disabled: true, badge: "Soon" },
   ];
 
   const agentItems: DropdownItem[] = [
-    { id: "agents", label: "Agent Registry", icon: Cpu },
-    { id: "agent-health", label: "Agent Health", icon: Cpu, disabled: true, badge: "Soon", badgeColor: "border-muted text-muted-foreground" },
-    { id: "hcs-topics", label: "HCS Topics", icon: Database, disabled: true, badge: "Soon", badgeColor: "border-muted text-muted-foreground" },
+    { path: "/agents", label: "Agent Registry", icon: Cpu },
+    { path: "/agent-health", label: "Agent Health", icon: Cpu, disabled: true, badge: "Soon" },
+    { path: "/hcs-topics", label: "HCS Topics", icon: Database, disabled: true, badge: "Soon" },
   ];
 
   const integrationItems: DropdownItem[] = [
-    { id: "integration-woocommerce", label: "WooCommerce", icon: Plug, badge: "Connected", badgeColor: "border-success/40 text-success" },
-    { id: "integration-fedex", label: "FedEx", icon: Package, badge: "Connected", badgeColor: "border-success/40 text-success" },
-    { id: "settings", label: "Settings & Docs", icon: Building2 },
+    { path: "/integrations/woocommerce", label: "WooCommerce", icon: Plug, badge: "Connected", badgeColor: "border-success/40 text-success" },
+    { path: "/integrations/fedex", label: "FedEx", icon: Package, badge: "Connected", badgeColor: "border-success/40 text-success" },
+    { path: "/settings", label: "Settings & Docs", icon: Building2 },
   ];
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
-      <div className="container flex h-14 items-center justify-between gap-2">
-        {/* Logo */}
-        <div className="flex items-center gap-2.5 shrink-0">
-          <img src={logo} alt="TruthForge" className="h-8 w-8 object-contain" />
-          <div className="hidden sm:block">
-            <h1 className="text-sm font-heading font-bold text-foreground leading-tight">TruthForge</h1>
-            <p className="text-[9px] text-muted-foreground leading-none tracking-wide uppercase">The Verifiable Intelligence Layer</p>
-          </div>
-        </div>
+    <>
+      <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+        <div className="container flex h-14 items-center justify-between gap-2">
 
-        {/* Dropdown Nav */}
-        <nav className="flex items-center gap-0.5 overflow-x-auto" role="navigation" aria-label="Main navigation">
-          <DropdownMenu label="Portal" icon={Anchor} items={portalItems} activeTab={activeTab} onSelect={onTabChange} />
-          <DropdownMenu label="Dashboard" icon={BarChart3} items={dashboardItems} activeTab={activeTab} onSelect={onTabChange} />
-          <DropdownMenu label="Agents" icon={Cpu} items={agentItems} activeTab={activeTab} onSelect={onTabChange} />
-          <DropdownMenu label="Integrations" icon={Plug} items={integrationItems} activeTab={activeTab} onSelect={onTabChange} />
+          {/* Logo */}
           <button
-            onClick={() => onTabChange("help")}
-            className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded transition-colors whitespace-nowrap ${
-              activeTab === "help"
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-            }`}
+            onClick={() => navigate("/")}
+            className="flex items-center gap-2.5 shrink-0 hover:opacity-80 transition-opacity"
           >
-            <HelpCircle className="h-3.5 w-3.5" />
-            <span className="hidden lg:inline">Help</span>
-          </button>
-        </nav>
-
-        {/* Right Controls */}
-        <div className="flex items-center gap-2 shrink-0">
-          <WalletStatus portalRole={portalRole} />
-
-          <button
-            onClick={toggleTheme}
-            aria-label="Toggle theme"
-            className="p-1.5 rounded hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
-          >
-            {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+            <img src={logo} alt="TruthForge" className="h-8 w-8 object-contain" />
+            <div className="hidden sm:block">
+              <h1 className="text-sm font-heading font-bold text-foreground leading-tight">TruthForge</h1>
+              <p className="text-[9px] text-muted-foreground leading-none tracking-wide uppercase">The Verifiable Intelligence Layer</p>
+            </div>
           </button>
 
-          <div className={`flex items-center gap-2 px-3 py-1 rounded border text-xs font-heading font-bold tracking-wide uppercase ${
-            isMockMode
-              ? "border-warning/40 bg-warning/10 text-warning"
-              : "border-success/40 bg-success/10 text-success"
-          }`}>
-            <Database className="h-3 w-3" />
-            <span>{isMockMode ? "Mock" : "Live"}</span>
-            <Switch
-              checked={!isMockMode}
-              onCheckedChange={toggleMockMode}
-              aria-label="Toggle data mode"
-              className="scale-[0.65]"
-            />
+          {/* Nav */}
+          <nav className="flex items-center gap-0.5 overflow-x-auto" role="navigation" aria-label="Main navigation">
+            <DropdownMenu label="Portal" icon={Anchor} items={portalItems} />
+            <DropdownMenu label="Dashboard" icon={BarChart3} items={dashboardItems} />
+            <DropdownMenu label="Agents" icon={Cpu} items={agentItems} />
+            <DropdownMenu label="Integrations" icon={Plug} items={integrationItems} />
+            <button
+              onClick={() => setHelpOpen(true)}
+              className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium uppercase tracking-wide rounded transition-colors whitespace-nowrap ${
+                helpOpen
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+              }`}
+            >
+              <HelpCircle className="h-4 w-4" />
+              <span className="hidden lg:inline">Help</span>
+            </button>
+          </nav>
+
+          {/* Right Controls */}
+          <div className="flex items-center gap-2 shrink-0">
+            <WalletStatus />
+
+            <button
+              onClick={toggleTheme}
+              aria-label="Toggle theme"
+              className="p-1.5 rounded hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+            >
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
+
+            <div className={`flex items-center gap-2 px-3 py-1 rounded border text-xs font-bold tracking-wide uppercase ${
+              isMockMode
+                ? "border-warning/40 bg-warning/10 text-warning"
+                : "border-success/40 bg-success/10 text-success"
+            }`}>
+              <Database className="h-3 w-3" />
+              <span className="hidden sm:inline">{isMockMode ? "Mock" : "Live"}</span>
+              <Switch
+                checked={!isMockMode}
+                onCheckedChange={toggleMockMode}
+                aria-label="Toggle data mode"
+                className="scale-[0.65]"
+              />
+            </div>
           </div>
+
         </div>
-      </div>
-    </header>
+      </header>
+
+      {helpOpen && <HelpModal onClose={() => setHelpOpen(false)} />}
+    </>
   );
 };
 
