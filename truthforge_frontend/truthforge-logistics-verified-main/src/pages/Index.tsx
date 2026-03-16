@@ -26,7 +26,10 @@ const pages: Record<string, ComponentType> = {
   agents: AgentsPage,
   tracking: TrackingPage,
   settings: SettingsPage,
-  // legacy alias kept for backward compat
+  // integration dropdown items all resolve to SettingsPage
+  "integration-woocommerce": SettingsPage,
+  "integration-fedex": SettingsPage,
+  // legacy alias
   carrier: CarrierPortalPage,
 };
 

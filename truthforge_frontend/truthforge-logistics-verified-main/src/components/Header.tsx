@@ -12,7 +12,6 @@ import {
 interface HeaderProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
-  showGovernance?: boolean;
   portalRole?: "merchant" | "carrier" | "port-authority" | null;
 }
 
@@ -162,7 +161,7 @@ const WalletStatus = ({ portalRole }: { portalRole?: "merchant" | "carrier" | "p
   );
 };
 
-const Header = ({ activeTab, onTabChange, showGovernance = false, portalRole }: HeaderProps) => {
+const Header = ({ activeTab, onTabChange, portalRole }: HeaderProps) => {
   const { isMockMode, toggleMockMode } = useMockMode();
   const { theme, toggleTheme } = useTheme();
 
@@ -185,9 +184,9 @@ const Header = ({ activeTab, onTabChange, showGovernance = false, portalRole }: 
   ];
 
   const integrationItems: DropdownItem[] = [
-    { id: "settings", label: "WooCommerce", icon: Plug, badge: "Connected", badgeColor: "border-success/40 text-success" },
-    { id: "settings", label: "FedEx", icon: Package, badge: "Connected", badgeColor: "border-success/40 text-success" },
-    { id: "settings", label: "Settings", icon: Building2 },
+    { id: "integration-woocommerce", label: "WooCommerce", icon: Plug, badge: "Connected", badgeColor: "border-success/40 text-success" },
+    { id: "integration-fedex", label: "FedEx", icon: Package, badge: "Connected", badgeColor: "border-success/40 text-success" },
+    { id: "settings", label: "Settings & Docs", icon: Building2 },
   ];
 
   return (

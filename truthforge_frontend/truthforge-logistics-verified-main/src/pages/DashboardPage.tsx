@@ -7,6 +7,8 @@ import OperationalNetworkFooter from "@/components/OperationalNetworkFooter";
 import PortOverviewMap from "@/components/PortOverviewMap";
 import GlobalTradeRiskCommandCenter from "@/components/GlobalTradeRiskCommandCenter";
 import { mockMetrics, mockShipments, mockPortTrustReceipts } from "@/lib/mock-data";
+import { useMockMode } from "@/contexts/MockModeContext";
+import { apiFetch, MockModeError } from "@/lib/api-client";
 import { useEffect, useState, useRef } from "react";
 
 const clearanceStatusConfig: Record<string, { color: string; label: string }> = {
@@ -16,10 +18,20 @@ const clearanceStatusConfig: Record<string, { color: string; label: string }> = 
 };
 
 const DashboardPage = () => {
+  const { isMockMode } = useMockMode();
   const [heroVisible, setHeroVisible] = useState(false);
   const heroRef = useRef<HTMLDivElement>(null);
   const [receiptModal, setReceiptModal] = useState<string | null>(null);
   const [selectedPort, setSelectedPort] = useState<string>("all");
+  const [metrics, setMetrics] = useState(mockMetrics);
+
+  // Fetch live metrics when not in mock mode
+  useEffect(() => {
+    if (isMockMode) { setMetrics(mockMetrics); return; }
+    apiFetch<typeof mockMetrics>("/api/dashboard/metrics")
+      .then(setMetrics)
+      .catch((err) => { if (!(err instanceof MockModeError)) console.warn("Metrics fetch failed, using mock", err); });
+  }, [isMockMode]);
 
   useEffect(() => {
     const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) setHeroVisible(true); }, { threshold: 0.2 });
@@ -59,15 +71,15 @@ const DashboardPage = () => {
             {/* Outcome Indicators */}
             <div className="grid grid-cols-3 gap-4 mb-6 max-w-xl">
               <div className="text-center">
-                <div className="text-2xl md:text-3xl font-heading font-black text-white">{mockMetrics.avgClearanceTime}</div>
+                <div className="text-2xl md:text-3xl font-heading font-black text-white">{metrics.avgClearanceTime}</div>
                 <div className="text-[10px] text-white/50 uppercase tracking-wider mt-1">Avg Clearance Reduction</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl md:text-3xl font-heading font-black text-white">{mockMetrics.documentsPreArrival.toLocaleString()}</div>
+                <div className="text-2xl md:text-3xl font-heading font-black text-white">{metrics.documentsPreArrival.toLocaleString()}</div>
                 <div className="text-[10px] text-white/50 uppercase tracking-wider mt-1">Docs Verified Pre-Arrival</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl md:text-3xl font-heading font-black text-white">{mockMetrics.shipmentsPreCleared.toLocaleString()}</div>
+                <div className="text-2xl md:text-3xl font-heading font-black text-white">{metrics.shipmentsPreCleared.toLocaleString()}</div>
                 <div className="text-[10px] text-white/50 uppercase tracking-wider mt-1">Shipments Pre-Cleared</div>
               </div>
             </div>
@@ -91,10 +103,10 @@ const DashboardPage = () => {
       <section aria-label="Operational metrics">
         <h3 className="text-sm font-heading font-bold text-muted-foreground uppercase tracking-wider mb-4">Operational Summary</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <MetricCard icon={Clock} label="Avg Clearance" value={mockMetrics.avgClearanceTime} variant="accent" />
-          <MetricCard icon={FileCheck} label="Docs Pre-Arrival" value={mockMetrics.documentsPreArrival.toLocaleString()} variant="default" />
-          <MetricCard icon={CheckCircle} label="Pre-Cleared" value={mockMetrics.shipmentsPreCleared.toLocaleString()} variant="success" />
-          <MetricCard icon={BarChart3} label="Shipments Today" value={mockMetrics.shipmentsToday} variant="default" />
+          <MetricCard icon={Clock} label="Avg Clearance" value={metrics.avgClearanceTime} variant="accent" />
+          <MetricCard icon={FileCheck} label="Docs Pre-Arrival" value={metrics.documentsPreArrival.toLocaleString()} variant="default" />
+          <MetricCard icon={CheckCircle} label="Pre-Cleared" value={metrics.shipmentsPreCleared.toLocaleString()} variant="success" />
+          <MetricCard icon={BarChart3} label="Shipments Today" value={metrics.shipmentsToday} variant="default" />
         </div>
       </section>
 
