@@ -1,11 +1,35 @@
 import { useState, useEffect, useCallback } from "react";
 import { useMockMode } from "@/contexts/MockModeContext";
 import { Switch } from "@/components/ui/switch";
-import { apiFetch, MockModeError } from "@/lib/api-client";
 import {
   Settings, Database, Globe, Shield, Key, Bell, Copy, RotateCw,
-  Code, BookOpen, Loader2, CheckCircle2, XCircle,
+  Code, BookOpen, Loader2, XCircle,
 } from "lucide-react";
+
+// ─── Config ───────────────────────────────────────────────────────────────────
+// Hardcode Railway URL as the single source of truth for integration calls.
+// This bypasses any apiFetch/mock-mode logic and hits the backend directly.
+const RAILWAY = "https://web-production-dcd43.up.railway.app";
+
+async function liveGet<T>(path: string): Promise<T> {
+  const res = await fetch(`${RAILWAY}${path}`, {
+    headers: { "Content-Type": "application/json" },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json() as Promise<T>;
+}
+
+async function livePost<T>(path: string, body?: unknown): Promise<T> {
+  const res = await fetch(`${RAILWAY}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json() as Promise<T>;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -127,6 +151,7 @@ const SettingsPage = () => {
   // Integration status state
   const [status, setStatus] = useState<IntegrationsStatus | null>(null);
   const [fetchError, setFetchError] = useState(false);
+  const [lastError, setLastError] = useState("");
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
 
   // Webhook URL local state (editable)
@@ -136,27 +161,19 @@ const SettingsPage = () => {
   const [savingWebhook, setSavingWebhook] = useState(false);
 
   // ── Fetch integration status from backend (live mode only) ──────────────────
-  // forceLive=true bypasses the localStorage mock-mode check in apiFetch.
-  // This is needed because localStorage is written asynchronously after React
-  // state updates, so it may still say "true" when we first switch to live mode.
   const fetchStatus = useCallback(async () => {
     if (isMockMode) return;
     setFetchError(false);
+    setLastError("");
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000); // 8s hard timeout
-      const data = await apiFetch<IntegrationsStatus>(
-        "/api/integrations/status",
-        { signal: controller.signal },
-        true // forceLive — skip localStorage check
-      );
-      clearTimeout(timeout);
+      const data = await liveGet<IntegrationsStatus>("/api/integrations/status");
       setStatus(data);
       setMerchantUrl(data.webhooks.merchant_url || "");
       setCarrierUrl(data.webhooks.carrier_url || "");
       setPortUrl(data.webhooks.port_authority_url || "");
     } catch (err) {
-      if (err instanceof MockModeError) return; // shouldn't happen with forceLive
+      const msg = err instanceof Error ? err.message : String(err);
+      setLastError(msg);
       setFetchError(true);
     }
   }, [isMockMode]);
@@ -174,7 +191,7 @@ const SettingsPage = () => {
   const toggle = async (key: string, action: "connect" | "disconnect") => {
     setLoadingKey(key);
     try {
-      await apiFetch(`/api/integrations/${key}/${action}`, { method: "POST" }, true);
+      await livePost(`/api/integrations/${key}/${action}`);
       await fetchStatus();
     } catch {
       // silently fail — status will stay as-is
@@ -191,10 +208,7 @@ const SettingsPage = () => {
       if (field === "merchant") payload.merchant_url = merchantUrl;
       if (field === "carrier") payload.carrier_url = carrierUrl;
       if (field === "port_authority") payload.port_authority_url = portUrl;
-      await apiFetch("/api/integrations/webhook/configure", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      }, true);
+      await livePost("/api/integrations/webhook/configure", payload);
       await fetchStatus();
     } catch {
       // silently fail
@@ -356,9 +370,12 @@ const SettingsPage = () => {
         </div>
 
         {!isMockMode && fetchError && (
-          <div className="flex items-center gap-2 p-3 rounded border border-destructive/30 bg-destructive/5 mb-3">
-            <XCircle className="h-4 w-4 text-destructive shrink-0" />
-            <p className="text-xs text-destructive">Could not reach backend. Check your connection.</p>
+          <div className="flex items-start gap-2 p-3 rounded border border-destructive/30 bg-destructive/5 mb-3">
+            <XCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs text-destructive font-medium">Could not reach backend.</p>
+              {lastError && <p className="text-[10px] text-destructive/70 mt-0.5 font-mono break-all">{lastError}</p>}
+            </div>
           </div>
         )}
 

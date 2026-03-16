@@ -4,13 +4,14 @@ import { Switch } from "@/components/ui/switch";
 import { useMockMode } from "@/contexts/MockModeContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useWallet } from "@/contexts/WalletContext";
-import { apiFetch, MockModeError } from "@/lib/api-client";
 import logo from "@/assets/truthforge-logo.png";
 import {
   Database, Sun, Moon, ChevronDown, Wallet, Anchor, BarChart3,
   FileText, Cpu, Plug, HelpCircle, LogOut, Building2, Package,
   Ship, X, BookOpen, Code, MessageSquare,
 } from "lucide-react";
+
+const RAILWAY = "https://web-production-dcd43.up.railway.app";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -250,15 +251,15 @@ const Header = () => {
   const fetchBadges = useCallback(async () => {
     if (isMockMode) { setWcConnected(true); setFedexConnected(true); return; }
     try {
-      const data = await apiFetch<{ woocommerce: { connected: boolean }; fedex: { connected: boolean } }>(
-        "/api/integrations/status"
-      );
+      const res = await fetch(`${RAILWAY}/api/integrations/status`, {
+        signal: AbortSignal.timeout(6000),
+      });
+      if (!res.ok) return;
+      const data = await res.json() as { woocommerce: { connected: boolean }; fedex: { connected: boolean } };
       setWcConnected(data.woocommerce.connected);
       setFedexConnected(data.fedex.connected);
-    } catch (err) {
-      if (!(err instanceof MockModeError)) {
-        // keep previous state on error
-      }
+    } catch {
+      // keep previous state on error
     }
   }, [isMockMode]);
 
