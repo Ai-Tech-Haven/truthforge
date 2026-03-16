@@ -7,8 +7,13 @@
  * When isMockMode=true, apiFetch throws so callers can fall back to mock data.
  */
 
-export const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
-export const WS_BASE = import.meta.env.VITE_WS_URL || "ws://localhost:5000";
+// In production (Vercel), VITE_API_URL must be set — falls back to Railway URL.
+// localhost:5000 is only used when running the dev server locally.
+const RAILWAY_URL = "https://web-production-dcd43.up.railway.app";
+const isDev = import.meta.env.DEV;
+
+export const API_BASE = import.meta.env.VITE_API_URL || (isDev ? "http://localhost:5000" : RAILWAY_URL);
+export const WS_BASE = import.meta.env.VITE_WS_URL || (isDev ? "ws://localhost:5000" : `wss://${RAILWAY_URL.replace("https://", "")}`);
 
 /** Read current mode directly from storage — usable outside React tree */
 export const getRuntimeMockMode = (): boolean => {
