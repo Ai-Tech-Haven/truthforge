@@ -14,6 +14,10 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+// Portal routes reuse Index with a hash-based tab pre-selection via URL
+// They redirect to /public so the SPA handles tab switching internally.
+// Deep-link support is handled by Index tab state.
+
 const App = () => {
   const [showSplash, setShowSplash] = useState(true);
 
@@ -33,6 +37,10 @@ const App = () => {
               <Route path="/signin" element={<SignInPage />} />
               <Route path="/public" element={<Index />} />
               <Route path="/operator" element={<OperatorDashboardPage />} />
+              {/* Portal routes — render Index; tab is selected via URL hash */}
+              <Route path="/portal/merchant" element={<Index />} />
+              <Route path="/portal/carrier" element={<Index />} />
+              <Route path="/portal/port-authority" element={<Index />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

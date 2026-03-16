@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ComponentType } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import Header from '@/components/Header';
@@ -9,6 +10,9 @@ import AgentsPage from '@/pages/AgentsPage';
 import TrackingPage from '@/pages/TrackingPage';
 import SettingsPage from '@/pages/SettingsPage';
 import GovernancePage from '@/pages/GovernancePage';
+import CarrierPortalPage from '@/pages/CarrierPortalPage';
+import MerchantPortalPage from '@/pages/MerchantPortalPage';
+import PortAuthorityPortalPage from '@/pages/PortAuthorityPortalPage';
 import FloatingChat from '@/components/FloatingChat';
 import { MockModeProvider } from '@/contexts/MockModeContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
@@ -18,13 +22,16 @@ import { Badge } from '@/components/ui/badge';
 import { LogOut, Shield } from 'lucide-react';
 import logo from '@/assets/truthforge-logo.png';
 
-const pages: Record<string, React.FC> = {
+const pages: Record<string, ComponentType> = {
   dashboard: DashboardPage,
   verification: VerificationPage,
   agents: AgentsPage,
   tracking: TrackingPage,
   governance: GovernancePage,
   settings: SettingsPage,
+  'portal-merchant': MerchantPortalPage,
+  'portal-carrier': CarrierPortalPage,
+  'portal-port-authority': PortAuthorityPortalPage,
 };
 
 const OperatorDashboardPage = () => {
@@ -43,6 +50,13 @@ const OperatorDashboardPage = () => {
   }
 
   const ActivePage = pages[activeTab] || DashboardPage;
+
+  const portalRoleMap: Record<string, 'merchant' | 'carrier' | 'port-authority' | null> = {
+    'portal-merchant': 'merchant',
+    'portal-carrier': 'carrier',
+    'portal-port-authority': 'port-authority',
+  };
+  const portalRole = portalRoleMap[activeTab] ?? null;
 
   // Role-based badge color
   const getRoleBadgeVariant = () => {
@@ -94,6 +108,7 @@ const OperatorDashboardPage = () => {
               activeTab={activeTab} 
               onTabChange={setActiveTab}
               showGovernance={hasRole(['operator', 'admin'])}
+              portalRole={portalRole}
             />
 
             {/* Main Content */}

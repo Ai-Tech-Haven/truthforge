@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { ComponentType } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import DashboardPage from "@/pages/DashboardPage";
@@ -7,34 +8,53 @@ import AgentsPage from "@/pages/AgentsPage";
 import TrackingPage from "@/pages/TrackingPage";
 import SettingsPage from "@/pages/SettingsPage";
 import CarrierPortalPage from "@/pages/CarrierPortalPage";
+import MerchantPortalPage from "@/pages/MerchantPortalPage";
+import PortAuthorityPortalPage from "@/pages/PortAuthorityPortalPage";
 import FloatingChat from "@/components/FloatingChat";
 import { MockModeProvider } from "@/contexts/MockModeContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { WalletProvider } from "@/contexts/WalletContext";
 
-const pages: Record<string, React.FC> = {
+type PortalRole = "merchant" | "carrier" | "port-authority" | null;
+
+const pages: Record<string, ComponentType> = {
   dashboard: DashboardPage,
   verification: VerificationPage,
-  carrier: CarrierPortalPage,
+  "portal-carrier": CarrierPortalPage,
+  "portal-merchant": MerchantPortalPage,
+  "portal-port-authority": PortAuthorityPortalPage,
   agents: AgentsPage,
   tracking: TrackingPage,
   settings: SettingsPage,
+  // legacy alias kept for backward compat
+  carrier: CarrierPortalPage,
+};
+
+const portalRoleMap: Record<string, PortalRole> = {
+  "portal-merchant": "merchant",
+  "portal-carrier": "carrier",
+  "portal-port-authority": "port-authority",
+  carrier: "carrier",
 };
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const ActivePage = pages[activeTab] || DashboardPage;
+  const portalRole = portalRoleMap[activeTab] ?? null;
 
   return (
     <ThemeProvider>
       <MockModeProvider>
-        <div className="min-h-screen bg-background flex flex-col">
-          <Header activeTab={activeTab} onTabChange={setActiveTab} />
-          <main className="container py-6 md:py-8 flex-grow">
-            <ActivePage />
-          </main>
-          <Footer />
-          <FloatingChat />
-        </div>
+        <WalletProvider>
+          <div className="min-h-screen bg-background flex flex-col">
+            <Header activeTab={activeTab} onTabChange={setActiveTab} portalRole={portalRole} />
+            <main className="container py-6 md:py-8 flex-grow">
+              <ActivePage />
+            </main>
+            <Footer />
+            <FloatingChat />
+          </div>
+        </WalletProvider>
       </MockModeProvider>
     </ThemeProvider>
   );
