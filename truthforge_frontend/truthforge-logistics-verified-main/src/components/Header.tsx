@@ -43,7 +43,7 @@ const DropdownMenu = ({ label, icon: Icon, items }: DropdownMenuProps) => {
   };
 
   const handleMouseLeave = () => {
-    closeTimer.current = setTimeout(() => setOpen(false), 100);
+    closeTimer.current = setTimeout(() => setOpen(false), 120);
   };
 
   useEffect(() => {
@@ -66,22 +66,26 @@ const DropdownMenu = ({ label, icon: Icon, items }: DropdownMenuProps) => {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
+      {/* Trigger button — fixed height, no layout-shifting transitions */}
       <button
         onClick={() => setOpen(o => !o)}
-        className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium uppercase tracking-wide rounded transition-colors whitespace-nowrap ${
+        className={`flex items-center gap-1.5 px-3 h-9 text-sm font-semibold uppercase tracking-wide rounded whitespace-nowrap transition-colors duration-150 ${
           isActive
-            ? "bg-primary text-primary-foreground"
-            : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+            ? "bg-accent/20 text-white"
+            : "text-slate-300 hover:text-white hover:bg-white/10"
         }`}
       >
-        {Icon && <Icon className="h-4 w-4" />}
-        <span>{label}</span>
-        <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+        {Icon && <Icon className="h-4 w-4 shrink-0" />}
+        <span className="hidden md:inline">{label}</span>
+        <ChevronDown
+          className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+        />
       </button>
 
+      {/* Dropdown panel — rendered outside header flow via absolute positioning */}
       {open && (
         <div
-          className="absolute top-full left-0 mt-1 min-w-[200px] rounded-lg border border-border bg-card shadow-elevated z-[100] py-1"
+          className="absolute top-full left-0 mt-1.5 min-w-[210px] rounded-md border border-white/10 bg-[#0b1f33] shadow-lg z-[9999] py-1 overflow-hidden"
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
@@ -98,20 +102,20 @@ const DropdownMenu = ({ label, icon: Icon, items }: DropdownMenuProps) => {
                     setOpen(false);
                   }
                 }}
-                className={`w-full flex items-center justify-between gap-2 px-4 py-2.5 text-sm transition-colors ${
+                className={`w-full flex items-center justify-between gap-2 px-4 py-2.5 text-sm transition-colors duration-100 ${
                   item.disabled
-                    ? "text-muted-foreground/40 cursor-not-allowed"
+                    ? "text-slate-600 cursor-not-allowed"
                     : isItemActive
-                    ? "bg-primary/10 text-primary font-medium"
-                    : "text-foreground hover:bg-white/5"
+                    ? "bg-accent/20 text-white font-semibold"
+                    : "text-slate-200 hover:bg-white/8 hover:text-white"
                 }`}
               >
                 <span className="flex items-center gap-2.5">
-                  {ItemIcon && <ItemIcon className="h-4 w-4 shrink-0" />}
+                  {ItemIcon && <ItemIcon className="h-4 w-4 shrink-0 opacity-70" />}
                   {item.label}
                 </span>
                 {item.badge && (
-                  <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${item.badgeColor || "border-border text-muted-foreground"}`}>
+                  <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${item.badgeColor || "border-white/20 text-slate-400"}`}>
                     {item.badge}
                   </span>
                 )}
@@ -140,7 +144,7 @@ const HelpModal = ({ onClose }: { onClose: () => void }) => (
           <HelpCircle className="h-4 w-4 text-accent" />
           Help &amp; Documentation
         </h3>
-        <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
+        <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-opacity">
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -151,7 +155,10 @@ const HelpModal = ({ onClose }: { onClose: () => void }) => (
           { icon: Database, label: "HCS Data Schema", desc: "Hedera Consensus Service message formats" },
           { icon: MessageSquare, label: "Support Chat", desc: "Talk to the TruthForge team" },
         ].map(item => (
-          <div key={item.label} className="flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-secondary/50 transition-colors cursor-pointer">
+          <div
+            key={item.label}
+            className="flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-secondary/50 transition-colors cursor-pointer"
+          >
             <item.icon className="h-4 w-4 text-accent mt-0.5 shrink-0" />
             <div>
               <div className="text-sm font-medium text-foreground">{item.label}</div>
@@ -172,10 +179,8 @@ const WalletStatus = () => {
   const [hover, setHover] = useState(false);
   const [connecting, setConnecting] = useState(false);
 
-  // Only show on portal pages
-  const isPortalPage = ["/merchant", "/carrier", "/port-authority"].includes(location.pathname);
-  const isPortAuthority = location.pathname === "/port-authority";
-  if (!isPortalPage || isPortAuthority) return null;
+  const isPortalPage = ["/merchant", "/carrier"].includes(location.pathname);
+  if (!isPortalPage) return null;
 
   const roleLabel = location.pathname === "/merchant" ? "Merchant" : "Carrier";
 
@@ -190,7 +195,7 @@ const WalletStatus = () => {
       <button
         onClick={handleConnect}
         disabled={connecting}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-accent/40 bg-accent/10 text-accent text-xs font-bold uppercase tracking-wider hover:bg-accent/20 transition-colors disabled:opacity-50"
+        className="flex items-center gap-1.5 px-3 h-8 rounded border border-accent/40 bg-accent/10 text-accent text-xs font-bold uppercase tracking-wider hover:bg-accent/20 transition-colors disabled:opacity-50"
       >
         <Wallet className="h-3.5 w-3.5" />
         <span className="hidden sm:inline">{connecting ? "Connecting..." : "Connect Wallet"}</span>
@@ -204,17 +209,17 @@ const WalletStatus = () => {
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-success/40 bg-success/10 text-success text-xs font-bold cursor-pointer">
+      <div className="flex items-center gap-1.5 px-3 h-8 rounded border border-success/40 bg-success/10 text-success text-xs font-bold cursor-pointer">
         <Wallet className="h-3.5 w-3.5" />
         <span className="hidden sm:inline">Wallet — {wallet?.address}</span>
       </div>
       {hover && (
-        <div className="absolute top-full right-0 mt-1 w-56 rounded-lg border border-border bg-card shadow-elevated z-[100] p-3 space-y-2">
-          <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Network</div>
-          <div className="text-xs text-foreground font-medium">Hedera Testnet</div>
-          <div className="text-[10px] text-muted-foreground uppercase tracking-wider mt-2">Role</div>
-          <div className="text-xs text-foreground font-medium">{roleLabel}</div>
-          <div className="text-[10px] text-muted-foreground uppercase tracking-wider mt-2">Account</div>
+        <div className="absolute top-full right-0 mt-1.5 w-56 rounded-md border border-white/10 bg-[#0b1f33] shadow-lg z-[9999] p-3 space-y-2">
+          <div className="text-[10px] text-slate-400 uppercase tracking-wider">Network</div>
+          <div className="text-xs text-white font-medium">Hedera Testnet</div>
+          <div className="text-[10px] text-slate-400 uppercase tracking-wider mt-2">Role</div>
+          <div className="text-xs text-white font-medium">{roleLabel}</div>
+          <div className="text-[10px] text-slate-400 uppercase tracking-wider mt-2">Account</div>
           <div className="text-xs font-mono text-accent">{wallet?.address}</div>
           <button
             onClick={disconnectWallet}
@@ -235,7 +240,6 @@ const Header = () => {
   const { isMockMode, toggleMockMode } = useMockMode();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
-  const location = useLocation();
   const [helpOpen, setHelpOpen] = useState(false);
 
   const portalItems: DropdownItem[] = [
@@ -265,36 +269,41 @@ const Header = () => {
 
   return (
     <>
-      <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
-        <div className="container flex h-14 items-center justify-between gap-2">
+      {/*
+        overflow-visible is critical — without it the sticky header clips
+        the absolutely-positioned dropdown panels.
+        h-14 is fixed — no padding/height changes on hover.
+      */}
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0a1628]/95 backdrop-blur overflow-visible">
+        <div className="container flex h-14 items-center justify-between gap-2 overflow-visible">
 
-          {/* Logo */}
+          {/* Logo — transition-opacity only, no layout shift */}
           <button
             onClick={() => navigate("/")}
-            className="flex items-center gap-2.5 shrink-0 hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2.5 shrink-0 transition-opacity duration-150 hover:opacity-80"
           >
             <img src={logo} alt="TruthForge" className="h-8 w-8 object-contain" />
             <div className="hidden sm:block">
-              <h1 className="text-sm font-heading font-bold text-foreground leading-tight">TruthForge</h1>
-              <p className="text-[9px] text-muted-foreground leading-none tracking-wide uppercase">The Verifiable Intelligence Layer</p>
+              <h1 className="text-sm font-bold text-white leading-tight tracking-wide">TruthForge</h1>
+              <p className="text-[9px] text-slate-400 leading-none tracking-widest uppercase">The Verifiable Intelligence Layer</p>
             </div>
           </button>
 
-          {/* Nav */}
-          <nav className="flex items-center gap-0.5 overflow-x-auto" role="navigation" aria-label="Main navigation">
+          {/* Nav — overflow-visible so dropdowns escape the header */}
+          <nav
+            className="flex items-center gap-0.5 overflow-visible"
+            role="navigation"
+            aria-label="Main navigation"
+          >
             <DropdownMenu label="Portal" icon={Anchor} items={portalItems} />
             <DropdownMenu label="Dashboard" icon={BarChart3} items={dashboardItems} />
             <DropdownMenu label="Agents" icon={Cpu} items={agentItems} />
             <DropdownMenu label="Integrations" icon={Plug} items={integrationItems} />
             <button
               onClick={() => setHelpOpen(true)}
-              className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium uppercase tracking-wide rounded transition-colors whitespace-nowrap ${
-                helpOpen
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-              }`}
+              className="flex items-center gap-1.5 px-3 h-9 text-sm font-semibold uppercase tracking-wide rounded whitespace-nowrap transition-colors duration-150 text-slate-300 hover:text-white hover:bg-white/10"
             >
-              <HelpCircle className="h-4 w-4" />
+              <HelpCircle className="h-4 w-4 shrink-0" />
               <span className="hidden lg:inline">Help</span>
             </button>
           </nav>
@@ -306,12 +315,12 @@ const Header = () => {
             <button
               onClick={toggleTheme}
               aria-label="Toggle theme"
-              className="p-1.5 rounded hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+              className="p-1.5 rounded transition-colors duration-150 text-slate-400 hover:text-white hover:bg-white/10"
             >
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
 
-            <div className={`flex items-center gap-2 px-3 py-1 rounded border text-xs font-bold tracking-wide uppercase ${
+            <div className={`flex items-center gap-2 px-3 h-8 rounded border text-xs font-bold tracking-wide uppercase ${
               isMockMode
                 ? "border-warning/40 bg-warning/10 text-warning"
                 : "border-success/40 bg-success/10 text-success"

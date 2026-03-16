@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Shield, Clock, FileCheck, CheckCircle, BarChart3, Package, Ship, Anchor, ArrowRight } from "lucide-react";
+import { Clock, FileCheck, CheckCircle, BarChart3, Package, Ship, Anchor, ArrowRight } from "lucide-react";
 import MetricCard from "@/components/MetricCard";
 import HeroValueSlider from "@/components/HeroValueSlider";
 import PortOverviewMap from "@/components/PortOverviewMap";
@@ -9,6 +9,7 @@ import { mockMetrics } from "@/lib/mock-data";
 import { useMockMode } from "@/contexts/MockModeContext";
 import { apiFetch, MockModeError } from "@/lib/api-client";
 import { useEffect, useState } from "react";
+import truthforgeLogo from "@/assets/truthforge-logo.png";
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -27,24 +28,30 @@ const LandingPage = () => {
       path: "/merchant",
       label: "Merchant Portal",
       icon: Package,
-      color: "border-accent/40 hover:border-accent bg-accent/5 hover:bg-accent/10",
+      bg: "bg-[#0b1f33] hover:bg-[#0d2540]",
+      border: "border-accent/30 hover:border-accent/60",
       iconColor: "text-accent",
+      accentBar: "bg-accent",
       desc: "Manage shipments, request pre-clearance, connect carriers",
     },
     {
       path: "/carrier",
       label: "Carrier Portal",
       icon: Ship,
-      color: "border-success/40 hover:border-success bg-success/5 hover:bg-success/10",
+      bg: "bg-[#0b1f33] hover:bg-[#0d2540]",
+      border: "border-success/30 hover:border-success/60",
       iconColor: "text-success",
+      accentBar: "bg-success",
       desc: "Upload documents, verify cargo, issue trust receipts",
     },
     {
       path: "/port-authority",
       label: "Port Authority Portal",
       icon: Anchor,
-      color: "border-warning/40 hover:border-warning bg-warning/5 hover:bg-warning/10",
-      iconColor: "text-warning",
+      bg: "bg-[#0b1f33] hover:bg-[#0d2540]",
+      border: "border-[hsl(190,100%,50%)]/30 hover:border-[hsl(190,100%,50%)]/60",
+      iconColor: "text-[hsl(190,100%,50%)]",
+      accentBar: "bg-[hsl(190,100%,50%)]",
       desc: "Pre-arrival queue, vessel intelligence, container grid",
     },
   ];
@@ -96,8 +103,8 @@ const LandingPage = () => {
 
       {/* What is TruthForge */}
       <section className="rounded-xl border border-border bg-card p-6 md:p-8 shadow-card">
-        <div className="flex items-center gap-2 mb-3">
-          <Shield className="h-5 w-5 text-accent" />
+        <div className="flex items-center gap-3 mb-4">
+          <img src={truthforgeLogo} alt="TruthForge" className="h-8 w-8 object-contain" />
           <h3 className="text-lg font-heading font-bold text-foreground">What is TruthForge?</h3>
         </div>
         <p className="text-sm text-muted-foreground leading-relaxed max-w-3xl">
@@ -116,21 +123,23 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Portal CTAs */}
+      {/* Portal CTAs — compact navy cards */}
       <section>
         <h3 className="text-sm font-heading font-bold text-muted-foreground uppercase tracking-wider mb-4">Access Your Portal</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {portals.map(({ path, label, icon: Icon, color, iconColor, desc }) => (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {portals.map(({ path, label, icon: Icon, bg, border, iconColor, accentBar, desc }) => (
             <button
               key={path}
               onClick={() => navigate(path)}
-              className={`rounded-xl border p-6 text-left transition-all duration-200 shadow-card hover:shadow-elevated ${color}`}
+              className={`rounded-xl border p-5 text-left transition-colors duration-150 shadow-card ${bg} ${border} group`}
             >
-              <Icon className={`h-8 w-8 mb-3 ${iconColor}`} />
-              <h4 className="font-heading font-bold text-foreground text-sm mb-1">{label}</h4>
-              <p className="text-xs text-muted-foreground mb-4">{desc}</p>
-              <span className={`inline-flex items-center gap-1 text-xs font-heading font-bold uppercase tracking-wider ${iconColor}`}>
-                Open Portal <ArrowRight className="h-3 w-3" />
+              {/* Top accent bar */}
+              <div className={`h-0.5 w-8 rounded-full mb-4 ${accentBar} transition-all duration-150 group-hover:w-16`} />
+              <Icon className={`h-7 w-7 mb-3 ${iconColor}`} />
+              <h4 className="font-heading font-bold text-white text-sm mb-1">{label}</h4>
+              <p className="text-xs text-slate-400 mb-4 leading-relaxed">{desc}</p>
+              <span className={`inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider ${iconColor}`}>
+                Open Portal <ArrowRight className="h-3 w-3 transition-transform duration-150 group-hover:translate-x-0.5" />
               </span>
             </button>
           ))}
