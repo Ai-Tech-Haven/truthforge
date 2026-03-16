@@ -1,0 +1,8 @@
+{
+  "buildCommand": "cd truthforge_frontend/truthforge-logistics-verified-main && npm install && npm run build",
+  "outputDirectory": "truthforge_frontend/truthforge-logistics-verified-main/dist",
+  "framework": null,
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
