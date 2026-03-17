@@ -280,8 +280,7 @@ const Header = () => {
 
   const agentItems: DropdownItem[] = [
     { path: "/agents", label: "Agent Registry", icon: Cpu },
-    { path: "/agent-health", label: "Agent Health", icon: Cpu, disabled: true, badge: "Soon" },
-    { path: "/hcs-topics", label: "HCS Topics", icon: Database, disabled: true, badge: "Soon" },
+    { label: "Coming Soon", icon: Cpu, disabled: true },
   ];
 
   const integrationItems: DropdownItem[] = [
