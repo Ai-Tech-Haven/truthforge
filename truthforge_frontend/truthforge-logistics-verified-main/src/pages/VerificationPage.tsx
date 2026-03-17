@@ -1,13 +1,12 @@
-﻿import { mockVerifications } from "@/lib/mock-data";
-import { Verification } from "@/lib/mock-data";
-import { Search, Filter, FileCheck, CheckCircle, Clock, XCircle, ExternalLink } from "lucide-react";
+﻿import { mockVerifications, Verification } from "@/lib/mock-data";
+import { Search, Filter, FileCheck, CheckCircle, Clock, XCircle, ExternalLink, RefreshCw } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { useMockMode } from "@/contexts/MockModeContext";
 
 const RAILWAY = "https://web-production-dcd43.up.railway.app";
 
 const statusConfig: Record<string, { icon: typeof CheckCircle; color: string; bg: string; label: string }> = {
-  verified: { icon: CheckCircle, color: "text-success", bg: "bg-success/10", label: "Verified" },
+  verified: { icon: CheckCircle, color: "text-success",     bg: "bg-success/10",     label: "Verified" },
   pending:  { icon: Clock,        color: "text-warning",     bg: "bg-warning/10",     label: "Pending"  },
   failed:   { icon: XCircle,      color: "text-destructive", bg: "bg-destructive/10", label: "Failed"   },
 };
@@ -16,15 +15,15 @@ const VerificationPage = () => {
   const { isMockMode } = useMockMode();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  // live mode starts empty â€” no cached mock data shown
   const [verifications, setVerifications] = useState<Verification[]>(isMockMode ? mockVerifications : []);
   const [loading, setLoading] = useState(!isMockMode);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   const fetchLive = useCallback(async () => {
     setLoading(true);
     setError(null);
-    setVerifications([]); // clear any stale data before fetching
+    setVerifications([]);
     try {
       const res = await fetch(`${RAILWAY}/api/verifications`, {
         signal: AbortSignal.timeout(8000),
@@ -32,6 +31,7 @@ const VerificationPage = () => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setVerifications(data.verifications ?? data);
+      setLastUpdated(new Date().toLocaleTimeString());
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to fetch verifications");
     } finally {
@@ -46,6 +46,7 @@ const VerificationPage = () => {
       setVerifications(mockVerifications);
       setLoading(false);
       setError(null);
+      setLastUpdated(null);
     }
   }, [isMockMode, fetchLive]);
 
@@ -59,7 +60,7 @@ const VerificationPage = () => {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-xl font-heading font-bold text-foreground flex items-center gap-2">
             <FileCheck className="h-5 w-5 text-accent" />
@@ -69,15 +70,23 @@ const VerificationPage = () => {
             Document verification outcomes with linked Hedera consensus proofs.
           </p>
         </div>
-        <span
-          className={`text-[10px] font-heading font-bold px-2 py-1 rounded uppercase tracking-wider border ${
-            isMockMode
-              ? "bg-warning/10 text-warning border-warning/30"
-              : "bg-success/10 text-success border-success/30"
-          }`}
-        >
-          {isMockMode ? "Preview Mode" : "Live Mode"}
-        </span>
+        <div className="flex items-center gap-3">
+          {lastUpdated && <span className="text-[10px] text-muted-foreground">Updated {lastUpdated}</span>}
+          {!isMockMode && (
+            <button
+              onClick={fetchLive}
+              disabled={loading}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-border bg-secondary hover:bg-accent/10 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+              aria-label="Refresh verifications"
+            >
+              <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
+              {loading ? "Refreshing..." : "Refresh"}
+            </button>
+          )}
+          <span className={`text-[10px] font-heading font-bold px-2 py-1 rounded uppercase tracking-wider border ${isMockMode ? "bg-warning/10 text-warning border-warning/30" : "bg-success/10 text-success border-success/30"}`}>
+            {isMockMode ? "Preview Mode" : "Live Mode"}
+          </span>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
@@ -98,11 +107,7 @@ const VerificationPage = () => {
             <button
               key={s}
               onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1.5 text-xs font-medium rounded capitalize transition-colors ${
-                statusFilter === s
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-muted-foreground hover:text-foreground hover:bg-accent/10"
-              }`}
+              className={`px-3 py-1.5 text-xs font-medium rounded capitalize transition-colors ${statusFilter === s ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground hover:bg-accent/10"}`}
               aria-label={`Filter by ${s}`}
             >
               {s}
@@ -114,18 +119,15 @@ const VerificationPage = () => {
       {error && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive flex items-center justify-between gap-4">
           <span>{error}</span>
-          <button
-            onClick={fetchLive}
-            className="text-xs font-medium underline hover:no-underline shrink-0"
-          >
-            Retry
-          </button>
+          <button onClick={fetchLive} className="text-xs font-medium underline hover:no-underline shrink-0">Retry</button>
         </div>
       )}
 
       <div className="rounded-xl border border-border bg-card shadow-card overflow-x-auto">
         {loading ? (
-          <div className="py-12 text-center text-muted-foreground text-sm">Loading live verifications...</div>
+          <div className="py-12 text-center text-muted-foreground text-sm animate-pulse">
+            Fetching live verifications from backend...
+          </div>
         ) : (
           <table className="w-full table-fixed" role="table">
             <thead>
@@ -152,20 +154,14 @@ const VerificationPage = () => {
                     <td className="py-3 px-4 text-xs text-foreground whitespace-nowrap">{v.type}</td>
                     <td className="py-3 px-4">
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap ${cfg.bg} ${cfg.color}`}>
-                        <Icon className="h-3 w-3 shrink-0" />
-                        {cfg.label}
+                        <Icon className="h-3 w-3 shrink-0" />{cfg.label}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-[11px] text-muted-foreground whitespace-nowrap max-w-[140px] truncate" title={v.agent}>{v.agent}</td>
                     <td className="py-3 px-4 text-[11px] font-mono text-muted-foreground whitespace-nowrap">{v.timestamp}</td>
                     <td className="py-3 px-4">
                       {isLinkable ? (
-                        <a
-                          href={`https://hashscan.io/testnet/topic/${topicId}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-[11px] font-mono text-accent hover:underline whitespace-nowrap"
-                        >
+                        <a href={`https://hashscan.io/testnet/topic/${topicId}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] font-mono text-accent hover:underline whitespace-nowrap">
                           <ExternalLink className="h-3 w-3 shrink-0" />
                           <span className="truncate max-w-[110px]">{v.hcsProof}</span>
                         </a>
@@ -177,9 +173,7 @@ const VerificationPage = () => {
                     </td>
                     <td className="py-3 px-4">
                       {v.confidence > 0 ? (
-                        <span className={`text-xs font-medium whitespace-nowrap ${v.confidence > 90 ? "text-success" : v.confidence > 50 ? "text-warning" : "text-destructive"}`}>
-                          {v.confidence}%
-                        </span>
+                        <span className={`text-xs font-medium whitespace-nowrap ${v.confidence > 90 ? "text-success" : v.confidence > 50 ? "text-warning" : "text-destructive"}`}>{v.confidence}%</span>
                       ) : (
                         <span className="text-[11px] text-muted-foreground">-</span>
                       )}
@@ -191,8 +185,9 @@ const VerificationPage = () => {
           </table>
         )}
         {!loading && filtered.length === 0 && (
-          <div className="py-12 text-center text-muted-foreground text-sm">
-            {isMockMode ? "No verifications match your filters." : "No live verification data available yet."}
+          <div className="py-12 text-center space-y-1">
+            <p className="text-sm text-muted-foreground">{isMockMode ? "No verifications match your filters." : "No live verification data yet."}</p>
+            {!isMockMode && <p className="text-xs text-muted-foreground/60">Data will appear automatically when the backend processes real shipments.</p>}
           </div>
         )}
       </div>

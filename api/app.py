@@ -76,6 +76,68 @@ def create_app(
     # Register routes
     register_routes(app)
     
+
+    @app.route('/api/operational/metrics', methods=['GET'])
+    def get_operational_metrics():
+        """GET /api/operational/metrics - Real-time chart data for operational oversight"""
+        try:
+            config = app.config['TRUTHFORGE_CONFIG']
+
+            if not config.mock_mode:
+                # LIVE MODE: build from real shipment data
+                from database.services import ShipmentService
+                from collections import defaultdict
+                import calendar
+                try:
+                    shipments, _ = ShipmentService.list_shipments(limit=500, offset=0)
+                    day_buckets = defaultdict(lambda: {"cleared": 0, "pending": 0, "flagged": 0})
+                    for s in shipments:
+                        if s.created_at:
+                            day_name = calendar.day_abbr[s.created_at.weekday()]
+                            status = (s.verification_status or "").lower()
+                            if status in ("verified", "cleared"):
+                                day_buckets[day_name]["cleared"] += 1
+                            elif "flag" in status:
+                                day_buckets[day_name]["flagged"] += 1
+                            else:
+                                day_buckets[day_name]["pending"] += 1
+                    throughput = [
+                        {"day": d, "cleared": v["cleared"], "pending": v["pending"], "flagged": v["flagged"]}
+                        for d, v in day_buckets.items()
+                    ]
+                    # HCS data: empty until real HCS tracking is wired
+                    return jsonify({"throughput": throughput, "hcs": []}), 200
+                except Exception as e:
+                    logger.error(f"Error fetching operational metrics: {e}")
+                    # Return empty — never fall back to mock data in live mode
+                    return jsonify({"throughput": [], "hcs": []}), 200
+
+            # MOCK MODE: return sample chart data
+            return jsonify({
+                "throughput": [
+                    {"day": "Mon", "cleared": 48, "pending": 5, "flagged": 2},
+                    {"day": "Tue", "cleared": 52, "pending": 8, "flagged": 1},
+                    {"day": "Wed", "cleared": 61, "pending": 4, "flagged": 3},
+                    {"day": "Thu", "cleared": 55, "pending": 6, "flagged": 2},
+                    {"day": "Fri", "cleared": 67, "pending": 3, "flagged": 1},
+                    {"day": "Sat", "cleared": 42, "pending": 7, "flagged": 0},
+                    {"day": "Sun", "cleared": 38, "pending": 2, "flagged": 1},
+                ],
+                "hcs": [
+                    {"hour": "00:00", "messages": 42},
+                    {"hour": "04:00", "messages": 28},
+                    {"hour": "08:00", "messages": 95},
+                    {"hour": "12:00", "messages": 134},
+                    {"hour": "16:00", "messages": 178},
+                    {"hour": "20:00", "messages": 112},
+                    {"hour": "23:59", "messages": 67},
+                ]
+            }), 200
+
+        except Exception as e:
+            logger.error(f"Error retrieving operational metrics: {e}", exc_info=True)
+            return handle_error("INTERNAL_ERROR", "An internal error occurred", 500)
+
     # Register error handlers
     register_error_handlers(app)
     

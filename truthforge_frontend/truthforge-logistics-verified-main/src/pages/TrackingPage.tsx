@@ -7,30 +7,37 @@ const RAILWAY = "https://web-production-dcd43.up.railway.app";
 
 interface ThroughputPoint { day: string; cleared: number; pending: number; flagged: number }
 interface HcsPoint { hour: string; messages: number }
-interface LiveMetrics { throughput?: ThroughputPoint[]; hcs?: HcsPoint[] }
+interface LiveMetrics { throughput: ThroughputPoint[]; hcs: HcsPoint[] }
 
 const TrackingPage = () => {
   const { isMockMode } = useMockMode();
-  const [liveMetrics, setLiveMetrics] = useState<LiveMetrics | null>(null);
+  const [liveMetrics, setLiveMetrics] = useState<LiveMetrics>({ throughput: [], hcs: [] });
+  const [loading, setLoading] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   const fetchLiveData = useCallback(async () => {
     if (isMockMode) return;
+    setLoading(true);
     try {
       const res = await fetch(`${RAILWAY}/api/operational/metrics`, {
         signal: AbortSignal.timeout(8000),
       });
       if (res.ok) {
         const data = await res.json();
-        setLiveMetrics(data);
+        setLiveMetrics({ throughput: data.throughput ?? [], hcs: data.hcs ?? [] });
+        setLastUpdated(new Date().toLocaleTimeString());
       }
     } catch {
-      // silently fail â€” charts fall back to default data
+      // keep empty arrays â€” do not fall back to mock data
+    } finally {
+      setLoading(false);
     }
   }, [isMockMode]);
 
   useEffect(() => {
     if (isMockMode) {
-      setLiveMetrics(null);
+      setLiveMetrics({ throughput: [], hcs: [] });
+      setLastUpdated(null);
       return;
     }
     fetchLiveData();
@@ -54,23 +61,29 @@ const TrackingPage = () => {
       </div>
 
       <section>
-        <div className="mb-4 flex items-start justify-between gap-4">
-          <div>
-            <h3 className="text-sm font-heading font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-              <Gauge className="h-4 w-4 text-accent" />
-              System Throughput &amp; Consensus Volume
-            </h3>
+        <div className="mb-4 flex items-start justify-between gap-4 flex-wrap">
+          <h3 className="text-sm font-heading font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+            <Gauge className="h-4 w-4 text-accent" />
+            System Throughput &amp; Consensus Volume
+          </h3>
+          <div className="flex items-center gap-3">
+            {lastUpdated && (
+              <span className="text-[10px] text-muted-foreground">Updated {lastUpdated}</span>
+            )}
+            {!isMockMode && (
+              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-destructive text-white text-[10px] font-heading font-bold uppercase tracking-wider">
+                <span className="h-2 w-2 rounded-full bg-white animate-ping" />
+                Real-time operational metrics for port authorities
+              </span>
+            )}
           </div>
-          {!isMockMode && (
-            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-destructive text-white text-[10px] font-heading font-bold uppercase tracking-wider shrink-0">
-              <span className="h-2 w-2 rounded-full bg-white animate-ping" />
-              Real-time operational metrics for port authorities
-            </span>
-          )}
         </div>
         <OperationalCharts
-          throughputData={liveMetrics?.throughput}
-          hcsData={liveMetrics?.hcs}
+          isLive={!isMockMode}
+          loading={loading}
+          throughputData={liveMetrics.throughput}
+          hcsData={liveMetrics.hcs}
+          onRefresh={!isMockMode ? fetchLiveData : undefined}
         />
       </section>
     </div>
