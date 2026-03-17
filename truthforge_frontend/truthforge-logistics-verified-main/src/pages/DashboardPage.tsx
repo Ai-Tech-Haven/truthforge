@@ -5,7 +5,6 @@ import HeroValueSlider from "@/components/HeroValueSlider";
 import MetricCard from "@/components/MetricCard";
 import OperationalNetworkFooter from "@/components/OperationalNetworkFooter";
 import PortOverviewMap from "@/components/PortOverviewMap";
-import GlobalTradeRiskCommandCenter from "@/components/GlobalTradeRiskCommandCenter";
 import { mockMetrics, mockShipments, mockPortTrustReceipts } from "@/lib/mock-data";
 import { useMockMode } from "@/contexts/MockModeContext";
 import { apiFetch, MockModeError } from "@/lib/api-client";
@@ -51,9 +50,6 @@ const DashboardPage = () => {
 
   return (
     <div className="space-y-8">
-      {/* Global Trade Risk Command Center */}
-      <GlobalTradeRiskCommandCenter />
-
       {/* Hero Section */}
       <section ref={heroRef} className="bg-hero rounded-xl p-8 md:p-10 relative overflow-hidden">
         <div className="absolute inset-0 opacity-5">
