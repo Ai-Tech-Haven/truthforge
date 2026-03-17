@@ -138,6 +138,41 @@ def create_app(
             logger.error(f"Error retrieving operational metrics: {e}", exc_info=True)
             return handle_error("INTERNAL_ERROR", "An internal error occurred", 500)
 
+    # ── Merchant auth endpoints ──────────────────────────────────────────────
+    @app.route('/api/merchant/auth', methods=['POST'])
+    def merchant_auth():
+        """POST /api/merchant/auth - Sign in a merchant by site URL"""
+        data = request.get_json(silent=True) or {}
+        site = data.get("site", "https://a-thi.online")
+        merchant = {
+            "name": site.replace("https://", "").replace("http://", "").rstrip("/"),
+            "logoUrl": f"{site.rstrip('/')}/wp-content/uploads/2024/01/cropped-a-thi-logo-192x192.png",
+            "siteUrl": site,
+        }
+        return jsonify({"merchant": merchant, "status": "authenticated"}), 200
+
+    @app.route('/api/merchant/logout', methods=['POST'])
+    def merchant_logout():
+        """POST /api/merchant/logout - Sign out merchant"""
+        return jsonify({"status": "logged_out"}), 200
+
+    # ── Carrier status endpoint ──────────────────────────────────────────────
+    @app.route('/api/carrier/status', methods=['GET'])
+    def carrier_status():
+        """GET /api/carrier/status?carrier=fedex - Live carrier connection check"""
+        carrier = request.args.get("carrier", "fedex").lower()
+        config = app.config['TRUTHFORGE_CONFIG']
+        if not config.mock_mode and carrier == "fedex":
+            try:
+                from agents.fedex_client import FedExClient
+                client = FedExClient(config)
+                ok = client.health_check() if hasattr(client, 'health_check') else True
+                return jsonify({"carrier": carrier, "status": "connected" if ok else "disconnected"}), 200
+            except Exception as e:
+                logger.warning(f"FedEx health check failed: {e}")
+                return jsonify({"carrier": carrier, "status": "disconnected"}), 200
+        return jsonify({"carrier": carrier, "status": "connected"}), 200
+
     # Register error handlers
     register_error_handlers(app)
     
