@@ -1,27 +1,30 @@
 ﻿import { mockVerifications } from "@/lib/mock-data";
+import { Verification } from "@/lib/mock-data";
 import { Search, Filter, FileCheck, CheckCircle, Clock, XCircle, ExternalLink } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { useMockMode } from "@/contexts/MockModeContext";
 
 const RAILWAY = "https://web-production-dcd43.up.railway.app";
 
-const statusConfig = {
+const statusConfig: Record<string, { icon: typeof CheckCircle; color: string; bg: string; label: string }> = {
   verified: { icon: CheckCircle, color: "text-success", bg: "bg-success/10", label: "Verified" },
-  pending: { icon: Clock, color: "text-warning", bg: "bg-warning/10", label: "Pending" },
-  failed: { icon: XCircle, color: "text-destructive", bg: "bg-destructive/10", label: "Failed" },
+  pending:  { icon: Clock,        color: "text-warning",     bg: "bg-warning/10",     label: "Pending"  },
+  failed:   { icon: XCircle,      color: "text-destructive", bg: "bg-destructive/10", label: "Failed"   },
 };
 
 const VerificationPage = () => {
   const { isMockMode } = useMockMode();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [verifications, setVerifications] = useState(mockVerifications);
-  const [loading, setLoading] = useState(false);
+  // live mode starts empty â€” no cached mock data shown
+  const [verifications, setVerifications] = useState<Verification[]>(isMockMode ? mockVerifications : []);
+  const [loading, setLoading] = useState(!isMockMode);
   const [error, setError] = useState<string | null>(null);
 
   const fetchLive = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setVerifications([]); // clear any stale data before fetching
     try {
       const res = await fetch(`${RAILWAY}/api/verifications`, {
         signal: AbortSignal.timeout(8000),
@@ -41,11 +44,12 @@ const VerificationPage = () => {
       fetchLive();
     } else {
       setVerifications(mockVerifications);
+      setLoading(false);
       setError(null);
     }
   }, [isMockMode, fetchLive]);
 
-  const filtered = verifications.filter((v) => {
+  const filtered = verifications.filter((v: Verification) => {
     const matchesSearch =
       v.shipmentId.toLowerCase().includes(search.toLowerCase()) ||
       v.type.toLowerCase().includes(search.toLowerCase());
@@ -82,7 +86,7 @@ const VerificationPage = () => {
           <input
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
             placeholder="Search by shipment ID or document type..."
             className="w-full pl-10 pr-4 py-2 text-sm rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             aria-label="Search verifications"
@@ -108,14 +112,20 @@ const VerificationPage = () => {
       </div>
 
       {error && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {error}
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive flex items-center justify-between gap-4">
+          <span>{error}</span>
+          <button
+            onClick={fetchLive}
+            className="text-xs font-medium underline hover:no-underline shrink-0"
+          >
+            Retry
+          </button>
         </div>
       )}
 
       <div className="rounded-xl border border-border bg-card shadow-card overflow-x-auto">
         {loading ? (
-          <div className="py-12 text-center text-muted-foreground text-sm">Loading verifications...</div>
+          <div className="py-12 text-center text-muted-foreground text-sm">Loading live verifications...</div>
         ) : (
           <table className="w-full table-fixed" role="table">
             <thead>
@@ -130,8 +140,8 @@ const VerificationPage = () => {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((v) => {
-                const cfg = statusConfig[v.status];
+              {filtered.map((v: Verification) => {
+                const cfg = statusConfig[v.status] ?? statusConfig.pending;
                 const Icon = cfg.icon;
                 const topicMatch = v.hcsProof && v.hcsProof.match(/^([\w-]+)#/);
                 const topicId = topicMatch ? topicMatch[1] : null;
@@ -160,9 +170,7 @@ const VerificationPage = () => {
                           <span className="truncate max-w-[110px]">{v.hcsProof}</span>
                         </a>
                       ) : v.hcsProof !== "pending" && v.hcsProof !== "N/A" ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-mono text-accent whitespace-nowrap">
-                          <span className="truncate max-w-[120px]">{v.hcsProof}</span>
-                        </span>
+                        <span className="text-[11px] font-mono text-accent whitespace-nowrap truncate max-w-[120px] block">{v.hcsProof}</span>
                       ) : (
                         <span className="text-[11px] text-muted-foreground">{v.hcsProof}</span>
                       )}
@@ -183,7 +191,9 @@ const VerificationPage = () => {
           </table>
         )}
         {!loading && filtered.length === 0 && (
-          <div className="py-12 text-center text-muted-foreground text-sm">No verifications match your filters.</div>
+          <div className="py-12 text-center text-muted-foreground text-sm">
+            {isMockMode ? "No verifications match your filters." : "No live verification data available yet."}
+          </div>
         )}
       </div>
     </div>
