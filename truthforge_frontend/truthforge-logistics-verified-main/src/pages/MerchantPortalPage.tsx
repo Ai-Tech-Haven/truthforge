@@ -33,13 +33,39 @@ const MOCK_MERCHANT: MerchantUser = { name: ATHI_NAME, logoUrl: ATHI_LOGO, siteU
 
 // ─── HashPack wallet helper ──────────────────────────────────────────────────
 const HASHPACK_EXTENSION_URL = "https://www.hashpack.app/download";
-declare global { interface Window { hashpack?: { connect?: () => Promise<{ accountIds: string[] }> } } }
+
+// HashConnect v2 extension injects window.hashconnect
+declare global {
+  interface Window {
+    hashconnect?: {
+      init: (appMetadata: object, network: string, debug?: boolean) => Promise<{ topic: string; pairingString: string; savedPairings: { accountIds: string[] }[] }>;
+      connectToLocalWallet: (pairingString: string) => void;
+      pairingEvent?: { once: (cb: (data: { accountIds: string[] }) => void) => void };
+    };
+  }
+}
 
 async function connectHashPack(): Promise<string | null> {
-  if (window.hashpack?.connect) {
+  // HashConnect v2 — talks to the installed Chrome extension
+  if (typeof window !== "undefined" && window.hashconnect) {
     try {
-      const res = await window.hashpack.connect();
-      return res?.accountIds?.[0] ?? null;
+      const appMeta = { name: "TruthForge", description: "Logistics verification platform", icon: "https://truthforge.vercel.app/favicon.ico" };
+      const initData = await window.hashconnect.init(appMeta, "testnet", false);
+      // If already paired, return first account
+      if (initData.savedPairings?.length > 0) {
+        const ids = initData.savedPairings[0].accountIds;
+        if (ids?.length > 0) return ids[0];
+      }
+      // Trigger pairing via extension popup
+      window.hashconnect.connectToLocalWallet(initData.pairingString);
+      // Wait for pairing event (up to 60s)
+      return await new Promise<string | null>((resolve) => {
+        const timer = setTimeout(() => resolve(null), 60000);
+        window.hashconnect?.pairingEvent?.once((data) => {
+          clearTimeout(timer);
+          resolve(data?.accountIds?.[0] ?? null);
+        });
+      });
     } catch { return null; }
   }
   return null;
@@ -163,6 +189,11 @@ const MerchantPortalPage = () => {
 
   // ── Wallet ──
   const handleConnectWallet = async () => {
+    // If extension not present at all, open download page immediately
+    if (typeof window !== "undefined" && !window.hashconnect) {
+      window.open(HASHPACK_EXTENSION_URL, "_blank");
+      return;
+    }
     setWalletConnecting(true);
     const addr = await connectHashPack();
     if (addr) {
@@ -171,8 +202,7 @@ const MerchantPortalPage = () => {
       setWalletModalOpen(false);
       toast({ title: "Wallet connected", description: addr });
     } else {
-      // Extension not installed — open download page
-      window.open(HASHPACK_EXTENSION_URL, "_blank");
+      toast({ title: "Connection timed out", description: "Please approve the pairing request in HashPack.", variant: "destructive" });
     }
     setWalletConnecting(false);
   };
@@ -300,17 +330,17 @@ const MerchantPortalPage = () => {
         {/* Carrier Card */}
         <div className="rounded-xl border border-[hsl(213_50%_22%)] bg-[hsl(213_40%_14%)] p-4 flex flex-col gap-2 min-w-[200px]">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-heading font-bold text-muted-foreground uppercase tracking-wider">Connected Carrier</span>
+            <span className="text-[10px] font-heading font-bold text-white/60 uppercase tracking-wider">Connected Carrier</span>
             <span className={`h-2 w-2 rounded-full ${carrierStatus === "connected" ? "bg-success" : carrierStatus === "loading" ? "bg-warning animate-pulse" : "bg-destructive"}`} />
           </div>
           <div className="relative">
             <button
               onClick={() => setCarrierDropdownOpen(o => !o)}
-              className="flex items-center gap-2 w-full px-3 py-2 rounded-lg border border-[hsl(213_40%_28%)] bg-[hsl(213_40%_18%)] text-sm font-medium text-foreground hover:border-accent/40 transition-colors"
+              className="flex items-center gap-2 w-full px-3 py-2 rounded-lg border border-[hsl(213_40%_28%)] bg-[hsl(213_40%_18%)] text-sm font-medium text-white hover:border-accent/40 transition-colors"
             >
               <Package className="h-4 w-4 text-accent" />
               {selectedCarrierLabel}
-              <ChevronDown className={`h-3.5 w-3.5 ml-auto transition-transform ${carrierDropdownOpen ? "rotate-180" : ""}`} />
+              <ChevronDown className={`h-3.5 w-3.5 ml-auto text-white/60 transition-transform ${carrierDropdownOpen ? "rotate-180" : ""}`} />
             </button>
             {carrierDropdownOpen && (
               <div className="absolute top-full left-0 mt-1 w-full rounded-lg border border-border bg-card shadow-elevated z-20 py-1">
@@ -332,10 +362,10 @@ const MerchantPortalPage = () => {
             )}
           </div>
           <div className="flex items-center gap-1.5">
-            <span className={`text-[10px] font-medium ${carrierStatus === "connected" ? "text-success" : "text-muted-foreground"}`}>
+            <span className={`text-[10px] font-medium ${carrierStatus === "connected" ? "text-success" : "text-white/50"}`}>
               {carrierStatus === "connected" ? "Live feed active" : carrierStatus === "loading" ? "Connecting..." : "Disconnected"}
             </span>
-            <button onClick={checkCarrierStatus} className="ml-auto text-muted-foreground hover:text-foreground transition-colors">
+            <button onClick={checkCarrierStatus} className="ml-auto text-white/40 hover:text-white transition-colors">
               <RefreshCw className="h-3 w-3" />
             </button>
           </div>
@@ -343,7 +373,7 @@ const MerchantPortalPage = () => {
 
         {/* Pre-Clearance Toggle Card */}
         <div className="rounded-xl border border-[hsl(213_50%_22%)] bg-[hsl(213_40%_14%)] p-4 flex flex-col gap-2 min-w-[200px]">
-          <span className="text-[10px] font-heading font-bold text-muted-foreground uppercase tracking-wider">Pre-Clearance Mode</span>
+          <span className="text-[10px] font-heading font-bold text-white/60 uppercase tracking-wider">Pre-Clearance Mode</span>
           <div className="flex items-center gap-3">
             <Shield className="h-5 w-5 text-accent" />
             <button
@@ -357,7 +387,7 @@ const MerchantPortalPage = () => {
               )}
             </button>
           </div>
-          <p className="text-[10px] text-muted-foreground leading-snug">
+          <p className="text-[10px] text-white/60 leading-snug">
             {clearanceMode === "auto"
               ? "Shipments auto-submit to backend when ready."
               : "Each request requires your confirmation."}
@@ -366,22 +396,22 @@ const MerchantPortalPage = () => {
 
         {/* Wallet Card */}
         <div className="rounded-xl border border-[hsl(213_50%_22%)] bg-[hsl(213_40%_14%)] p-4 flex flex-col gap-2 min-w-[200px]">
-          <span className="text-[10px] font-heading font-bold text-muted-foreground uppercase tracking-wider">HashPack Wallet</span>
+          <span className="text-[10px] font-heading font-bold text-white/60 uppercase tracking-wider">HashPack Wallet</span>
           {walletAddress ? (
             <>
               <div className="flex items-center gap-2">
                 <Wallet className="h-4 w-4 text-success" />
                 <span className="font-mono text-xs text-success truncate">{walletAddress}</span>
               </div>
-              <button onClick={handleDisconnectWallet} className="text-[10px] text-muted-foreground hover:text-destructive transition-colors text-left">
+              <button onClick={handleDisconnectWallet} className="text-[10px] text-white/40 hover:text-destructive transition-colors text-left">
                 Disconnect wallet
               </button>
             </>
           ) : (
             <>
-              <div className="flex items-center gap-2 text-muted-foreground">
+              <div className="flex items-center gap-2 text-white/60">
                 <Wallet className="h-4 w-4" />
-                <span className="text-xs">No wallet connected</span>
+                <span className="text-xs text-white">No wallet connected</span>
               </div>
               <button
                 onClick={() => setWalletModalOpen(true)}
