@@ -38,6 +38,24 @@ export default defineConfig({
     global: "globalThis",
   },
   optimizeDeps: {
-    include: ["buffer", "process"],
+    include: [
+      "buffer",
+      "process",
+      "@walletconnect/core",
+      "@walletconnect/sign-client",
+      "@walletconnect/types",
+      "@walletconnect/utils",
+      "@walletconnect/universal-provider",
+      "@walletconnect/modal",
+    ],
+  },
+  build: {
+    rollupOptions: {
+      // Ensure walletconnect packages are bundled, not treated as external
+      external: [],
+    },
+    commonjsOptions: {
+      transformMixedEsModules: true,
+    },
   },
 });
