@@ -1,12 +1,7 @@
 
-A  _git_push.cjs
-M  truthforge_frontend/truthforge-logistics-verified-main/package.json
-M  truthforge_frontend/truthforge-logistics-verified-main/src/components/Header.tsx
-M  truthforge_frontend/truthforge-logistics-verified-main/src/contexts/WalletContext.tsx
-M  truthforge_frontend/truthforge-logistics-verified-main/src/pages/MerchantPortalPage.tsx
-M  truthforge_frontend/truthforge-logistics-verified-main/vite.config.ts
+A  _git_out.txt
 
-[main 622b6c5] fix: remove hedera-wallet-connect entirely — unblock Vercel build
- 6 files changed, 55 insertions(+), 384 deletions(-)
- create mode 100644 _git_push.cjs
+[main ea58e80] fix: remove hedera-wallet-connect entirely — unblock Vercel build
+ 1 file changed, 12 insertions(+)
+ create mode 100644 _git_out.txt
 
