@@ -1,0 +1,28 @@
+=== STATUS ===
+ M _git_out.txt
+?? _commit2.cjs
+?? _log.txt
+?? _status.txt
+
+=== ADD ===
+
+=== STATUS AFTER ADD ===
+A  _commit2.cjs
+M  _git_out.txt
+A  _log.txt
+A  _status.txt
+
+=== COMMIT ===
+[main 0b73b66] fix: strip wallet from CarrierPortalPage, remove junk temp files
+ 4 files changed, 48 insertions(+), 9 deletions(-)
+ create mode 100644 _commit2.cjs
+ create mode 100644 _log.txt
+ create mode 100644 _status.txt
+
+=== PUSH ===
+
+=== LOG ===
+0b73b66 fix: strip wallet from CarrierPortalPage, remove junk temp files
+ea58e80 fix: remove hedera-wallet-connect entirely — unblock Vercel build
+622b6c5 fix: remove hedera-wallet-connect entirely — unblock Vercel build
+2925539 fix(wallet): dynamic import hedera-wallet-connect in WalletContext — isolate wallet commit for easy revert
