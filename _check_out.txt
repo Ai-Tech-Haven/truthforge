@@ -1,5 +1,0 @@
-CARRIER_HAS_WALLET: true
-CARRIER_FIRST_IMPORT: import { useState, useEffect, useCallback, useRef } from "react"; | import { useMockMode } from "@/contexts/MockModeContext"; | import { mockShipments, mockPortTrustReceipts, ShipmentTracking } from "@/lib/mock-data"; | import { apiFetch } from "@/lib/api-client"; | import {
-PKG_HAS_HASHGRAPH: false
-PKG_HAS_WALLETCONNECT: false
-=== PUSH ===

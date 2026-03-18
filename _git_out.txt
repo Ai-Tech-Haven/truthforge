@@ -1,7 +1,0 @@
-
-A  _git_out.txt
-
-[main ea58e80] fix: remove hedera-wallet-connect entirely — unblock Vercel build
- 1 file changed, 12 insertions(+)
- create mode 100644 _git_out.txt
-

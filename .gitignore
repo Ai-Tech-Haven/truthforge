@@ -96,3 +96,8 @@ VISUAL_GUIDE.txt
 "Kiro prompt.txt"
 Kiro prompt.txt
 TruthForge Logo.png
+
+# ─── Temp scripts / output files ─────────────────────────────────────────────
+_*.cjs
+_*.txt
+_*_out.txt
