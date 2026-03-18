@@ -1,33 +1,22 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useMockMode } from "@/contexts/MockModeContext";
 import { mockShipments, mockPortTrustReceipts, ShipmentTracking } from "@/lib/mock-data";
 import { apiFetch } from "@/lib/api-client";
 import {
   Ship, Plane, Truck, CheckCircle, AlertTriangle, Clock,
-  Package, Wallet, ExternalLink, ChevronDown, LogIn, LogOut,
+  Package, ExternalLink, ChevronDown, LogIn, LogOut,
   RefreshCw, X
 } from "lucide-react";
 import CarrierVerificationPanel, { VerificationResult, TransportMode } from "@/components/CarrierVerificationPanel";
 import PortTrustReceipt from "@/components/PortTrustReceipt";
 import CarrierProcessingTimeline, { CarrierTimelineData } from "@/components/CarrierProcessingTimeline";
 import { useToast } from "@/hooks/use-toast";
-// hedera-wallet-connect loaded dynamically to avoid Rollup static-analysis errors
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyConnector = any;
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const RAILWAY = "https://web-production-dcd43.up.railway.app";
 const FEDEX_LOGO = "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/FedEx_Corporation_-_2016_Logo.svg/1200px-FedEx_Corporation_-_2016_Logo.svg.png";
 const FEDEX_NAME = "FedEx";
 const FEDEX_SITE = "https://www.fedex.com";
-const HASHPACK_URL = "https://www.hashpack.app/download";
-const WC_PROJECT_ID = "b0d4a8b7c3e2f1a9d6e5c4b3a2f1e0d9";
-const HC_APP_METADATA = {
-  name: "TruthForge",
-  description: "Logistics verification platform on Hedera",
-  icons: [`${typeof window !== "undefined" ? window.location.origin : ""}/favicon.ico`],
-  url: typeof window !== "undefined" ? window.location.origin : "https://truthforge.app",
-};
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type PreClearanceState = "none" | "pending" | "cleared" | "flagged";
@@ -45,7 +34,6 @@ const statusColor = {
   flagged: "text-destructive bg-destructive/10 border-destructive/30",
 };
 
-// ─── Mock timeline data per shipment ─────────────────────────────────────────
 const MOCK_TIMELINES: Record<string, CarrierTimelineData> = {
   "SHP-8821A": { shipment_received: true, documents_uploaded: true, agents_verified: true, submitted_for_clearance: true, port_pre_cleared: true },
   "SHP-8822B": { shipment_received: true, documents_uploaded: true, agents_verified: false },
@@ -53,24 +41,14 @@ const MOCK_TIMELINES: Record<string, CarrierTimelineData> = {
   "SHP-8824D": { shipment_received: true, documents_uploaded: true, agents_verified: true, submitted_for_clearance: true, port_pre_cleared: true },
 };
 
-// ─── Main Component ───────────────────────────────────────────────────────────
 const CarrierPortalPage = () => {
   const { isMockMode } = useMockMode();
   const { toast } = useToast();
 
-  // Carrier user widget
   const [carrier, setCarrier] = useState<CarrierUser | null>(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
 
-  // Wallet
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [walletModalOpen, setWalletModalOpen] = useState(false);
-  const [walletConnecting, setWalletConnecting] = useState(false);
-  const dAppConnectorRef = useRef<AnyConnector>(null);
-  const connectorInitialized = useRef(false);
-
-  // Verification / shipments
   const [transportMode, setTransportMode] = useState<TransportMode>("sea");
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
   const [preClearanceStates, setPreClearanceStates] = useState<Record<string, PreClearanceState>>({});
@@ -78,15 +56,11 @@ const CarrierPortalPage = () => {
   const [liveShipments, setLiveShipments] = useState<ShipmentTracking[]>([]);
   const [shipmentsLoading, setShipmentsLoading] = useState(false);
 
-  // ── Persist carrier/wallet ──
   useEffect(() => {
     const stored = localStorage.getItem("tf_carrier");
     if (stored) { try { setCarrier(JSON.parse(stored)); } catch { localStorage.removeItem("tf_carrier"); } }
-    const storedWallet = localStorage.getItem("tf_carrier_wallet");
-    if (storedWallet) setWalletAddress(storedWallet);
   }, []);
 
-  // ── Mock: auto-seed carrier ──
   useEffect(() => {
     if (isMockMode && !carrier) {
       setCarrier(MOCK_CARRIER);
@@ -94,7 +68,6 @@ const CarrierPortalPage = () => {
     }
   }, [isMockMode, carrier]);
 
-  // ── Live shipments ──
   const fetchLiveShipments = useCallback(async () => {
     if (isMockMode) return;
     setShipmentsLoading(true);
@@ -109,7 +82,6 @@ const CarrierPortalPage = () => {
 
   const shipments = isMockMode ? mockShipments : liveShipments;
 
-  // ── Auth ──
   const handleSignIn = async () => {
     setAuthLoading(true);
     try {
@@ -134,74 +106,22 @@ const CarrierPortalPage = () => {
 
   const handleSignOut = async () => {
     setUserMenuOpen(false);
-    try { await fetch(`${RAILWAY}/api/carrier/logout`, { method: "POST", body: JSON.stringify({ carrier: "fedex" }), signal: AbortSignal.timeout(4000) }); } catch { /* ignore */ }
+    try {
+      await fetch(`${RAILWAY}/api/carrier/logout`, {
+        method: "POST",
+        body: JSON.stringify({ carrier: "fedex" }),
+        signal: AbortSignal.timeout(4000),
+      });
+    } catch { /* ignore */ }
     setCarrier(null);
     localStorage.removeItem("tf_carrier");
     toast({ title: "Signed out" });
   };
 
-  // ── Wallet ──
-  const handleConnectWallet = async () => {
-    setWalletConnecting(true);
-    try {
-      if (!dAppConnectorRef.current || !connectorInitialized.current) {
-        const [hwc, { LedgerId }] = await Promise.all([
-          import('@hashgraph/hedera-wallet-connect'),
-          import('@hiero-ledger/sdk'),
-        ]);
-        const { DAppConnector, HederaJsonRpcMethod, HederaSessionEvent, HederaChainId } = hwc;
-        const connector = new DAppConnector(
-          HC_APP_METADATA, LedgerId.TESTNET, WC_PROJECT_ID,
-          Object.values(HederaJsonRpcMethod),
-          [HederaSessionEvent.ChainChanged, HederaSessionEvent.AccountsChanged],
-          [HederaChainId.Testnet],
-        );
-        await connector.init({ logger: "error" });
-        dAppConnectorRef.current = connector;
-        connectorInitialized.current = true;
-      }
-      await dAppConnectorRef.current.openModal();
-      const sessions = dAppConnectorRef.current.walletConnectClient?.session.getAll() ?? [];
-      const latest = sessions[sessions.length - 1];
-      const accountId =
-        latest?.namespaces?.hedera?.accounts?.[0]?.split(":")?.[2] ??
-        latest?.namespaces?.["hedera:testnet"]?.accounts?.[0]?.split(":")?.[2] ?? null;
-      if (accountId) {
-        setWalletAddress(accountId);
-        localStorage.setItem("tf_carrier_wallet", accountId);
-        setWalletModalOpen(false);
-        toast({ title: "Wallet connected", description: accountId });
-      } else {
-        toast({ title: "No account found", description: "Approve the connection in HashPack.", variant: "destructive" });
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (!msg.toLowerCase().includes("modal closed") && !msg.toLowerCase().includes("user rejected")) {
-        window.open(HASHPACK_URL, "_blank");
-        toast({ title: "Could not connect", description: "Install HashPack and try again.", variant: "destructive" });
-      }
-    } finally { setWalletConnecting(false); }
-  };
-
-  const handleDisconnectWallet = async () => {
-    try {
-      if (dAppConnectorRef.current) {
-        await dAppConnectorRef.current.disconnectAll();
-        dAppConnectorRef.current = null;
-        connectorInitialized.current = false;
-      }
-    } catch { /* ignore */ }
-    setWalletAddress(null);
-    localStorage.removeItem("tf_carrier_wallet");
-    toast({ title: "Wallet disconnected" });
-  };
-
-  // ── Pre-clearance ──
   const getShipmentState = (id: string): PreClearanceState =>
     preClearanceStates[id] ?? (mockPortTrustReceipts.find(r => r.shipmentId === id) ? "cleared" : "none");
 
   const handlePreClearance = async (shipment: ShipmentTracking) => {
-    if (!walletAddress) { setWalletModalOpen(true); return; }
     setPreClearanceStates(s => ({ ...s, [shipment.id]: "pending" }));
     if (isMockMode) {
       await new Promise(r => setTimeout(r, 1200));
@@ -211,7 +131,7 @@ const CarrierPortalPage = () => {
       try {
         await apiFetch(`/api/v1/shipments/${shipment.id}/pre-clearance`, {
           method: "POST",
-          body: JSON.stringify({ carrier: "fedex", wallet: walletAddress }),
+          body: JSON.stringify({ carrier: "fedex" }),
         });
         setPreClearanceStates(s => ({ ...s, [shipment.id]: "cleared" }));
         toast({ title: "Pre-Clearance Issued", description: `${shipment.id} cleared via live backend.` });
@@ -229,7 +149,6 @@ const CarrierPortalPage = () => {
     setTransportMode(result.transportMode);
   };
 
-  // ── Timeline builder ──
   const getTimeline = (shipment: ShipmentTracking): CarrierTimelineData => {
     if (isMockMode) return MOCK_TIMELINES[shipment.id] ?? {};
     const state = getShipmentState(shipment.id);
@@ -248,7 +167,6 @@ const CarrierPortalPage = () => {
 
   return (
     <div className="space-y-6 max-w-5xl">
-      {/* ── Page Header with Carrier Widget + Wallet ── */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-xl font-heading font-bold text-foreground flex items-center gap-2">
@@ -261,37 +179,11 @@ const CarrierPortalPage = () => {
           <div className={`inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded border text-[10px] font-heading font-bold uppercase tracking-wider ${
             isMockMode ? "border-warning/40 bg-warning/10 text-warning" : "border-success/40 bg-success/10 text-success"
           }`}>
-            {isMockMode ? "Mock Mode – Simulated Responses" : "Live Mode – Connected to Backend"}
+            {isMockMode ? "Mock Mode - Simulated Responses" : "Live Mode - Connected to Backend"}
           </div>
         </div>
 
-        {/* Carrier User Widget + Wallet — top-right, responsive */}
         <div className="flex items-center gap-2 flex-wrap justify-end">
-
-          {/* HashPack Wallet */}
-          <div className="rounded-xl border border-[hsl(213_50%_22%)] bg-[hsl(213_40%_14%)] px-3 py-2 flex items-center gap-2 min-w-[160px]">
-            {walletAddress ? (
-              <>
-                <Wallet className="h-3.5 w-3.5 text-success shrink-0" />
-                <span className="font-mono text-[10px] text-success truncate flex-1">{walletAddress}</span>
-                <button onClick={handleDisconnectWallet} className="text-white/30 hover:text-destructive transition-colors ml-1" title="Disconnect">
-                  <X className="h-3 w-3" />
-                </button>
-              </>
-            ) : (
-              <>
-                <Wallet className="h-3.5 w-3.5 text-white/50 shrink-0" />
-                <button
-                  onClick={() => setWalletModalOpen(true)}
-                  className="text-[10px] font-heading font-bold text-accent uppercase tracking-wider hover:text-accent/80 transition-colors"
-                >
-                  Connect Wallet
-                </button>
-              </>
-            )}
-          </div>
-
-          {/* Carrier User Widget */}
           <div className="relative">
             {carrier ? (
               <>
@@ -338,23 +230,19 @@ const CarrierPortalPage = () => {
         </div>
       </div>
 
-      {/* ── Upload & Verify — light navy card ── */}
       <div className="rounded-xl border border-[hsl(213_50%_28%)] bg-[hsl(213_45%_16%)] shadow-card overflow-hidden">
         <div className="px-5 py-3 border-b border-[hsl(213_50%_24%)]">
           <h3 className="text-sm font-heading font-bold text-white flex items-center gap-2">
             <Package className="h-4 w-4 text-accent" />
             Upload &amp; Verify Shipment
           </h3>
-          <p className="text-xs text-white/60 mt-0.5">
-            Submit carrier documents for Hedera-verified pre-clearance.
-          </p>
+          <p className="text-xs text-white/60 mt-0.5">Submit carrier documents for Hedera-verified pre-clearance.</p>
         </div>
         <div className="p-5">
           <CarrierVerificationPanel onVerified={handleVerified} />
         </div>
       </div>
 
-      {/* ── Shipment Intelligence (after verification) ── */}
       {verificationResult && (
         <div className="rounded-xl border border-border bg-card shadow-card p-5 space-y-4">
           <div className="flex items-center justify-between">
@@ -369,7 +257,6 @@ const CarrierPortalPage = () => {
               {verificationResult.status === "verified" ? "Pre-Cleared" : verificationResult.status}
             </span>
           </div>
-
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <div className="rounded border border-border bg-secondary/30 px-3 py-2">
               <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">Shipment ID</span>
@@ -386,12 +273,10 @@ const CarrierPortalPage = () => {
               </div>
             )}
           </div>
-
           <div className="rounded border border-border bg-secondary/30 px-3 py-3">
             <span className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">AI Reasoning</span>
             <p className="text-xs text-foreground leading-relaxed">{verificationResult.aiReasoning}</p>
           </div>
-
           {verificationResult.containers && verificationResult.containers.length > 0 && (
             <div>
               <h4 className="text-xs font-heading font-bold text-muted-foreground uppercase tracking-wider mb-2">
@@ -418,7 +303,7 @@ const CarrierPortalPage = () => {
                       <tr key={item.id} className={`border-t border-border ${i % 2 === 0 ? "" : "bg-secondary/20"}`}>
                         <td className="px-3 py-2 font-mono text-foreground">{item.id}</td>
                         {(verificationResult.transportMode === "air" || verificationResult.transportMode === "land") && (
-                          <td className="px-3 py-2 text-muted-foreground">{item.count ?? "—"}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{item.count ?? "-"}</td>
                         )}
                         <td className="px-3 py-2">
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border text-[10px] font-heading font-bold uppercase tracking-wider ${statusColor[item.status]}`}>
@@ -443,7 +328,6 @@ const CarrierPortalPage = () => {
         </div>
       )}
 
-      {/* ── Merchant Shipments with Timeline ── */}
       <div className="rounded-xl border border-border bg-card shadow-card overflow-hidden">
         <div className="p-5 border-b border-border flex items-center justify-between gap-3 flex-wrap">
           <div>
@@ -451,9 +335,7 @@ const CarrierPortalPage = () => {
               <Ship className="h-4 w-4 text-accent" />
               Merchant Shipments
             </h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Pre-clearance status synced in real time.
-            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">Pre-clearance status synced in real time.</p>
           </div>
           {!isMockMode && (
             <button onClick={fetchLiveShipments} className="text-muted-foreground hover:text-foreground transition-colors">
@@ -461,7 +343,6 @@ const CarrierPortalPage = () => {
             </button>
           )}
         </div>
-
         <div className="divide-y divide-border">
           {shipmentsLoading && (
             <div className="py-8 text-center text-muted-foreground text-sm animate-pulse">Loading live shipments...</div>
@@ -477,7 +358,6 @@ const CarrierPortalPage = () => {
             const receipt = receiptForShipment(shipment.id);
             const MIcon = shipment.freightMode === "air" ? Plane : shipment.freightMode === "land" ? Truck : Ship;
             const timeline = getTimeline(shipment);
-
             return (
               <div key={shipment.id} className="p-4 hover:bg-secondary/20 transition-colors">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -502,10 +382,9 @@ const CarrierPortalPage = () => {
                       )}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {shipment.carrier} · {shipment.origin} → {shipment.destination} · ETA {shipment.eta}
+                      {shipment.carrier} · {shipment.origin} to {shipment.destination} · ETA {shipment.eta}
                     </div>
                   </div>
-
                   <div className="flex items-center gap-2 flex-wrap">
                     {isCleared && receipt && (
                       <button
@@ -525,8 +404,6 @@ const CarrierPortalPage = () => {
                     </button>
                   </div>
                 </div>
-
-                {/* Carrier Processing Timeline */}
                 <CarrierProcessingTimeline data={timeline} preCleared={isCleared && !!receipt} />
               </div>
             );
@@ -534,7 +411,6 @@ const CarrierPortalPage = () => {
         </div>
       </div>
 
-      {/* ── Port Trust Receipt Modal ── */}
       {receiptModal && (() => {
         const receipt = receiptForShipment(receiptModal);
         if (!receipt) return null;
@@ -543,10 +419,12 @@ const CarrierPortalPage = () => {
             <div className="bg-card border border-border rounded-xl max-w-lg w-full max-h-[85vh] overflow-y-auto shadow-elevated" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between p-4 border-b border-border">
                 <div>
-                  <h3 className="font-heading font-bold text-foreground text-sm">Port Trust Receipt – {receipt.shipmentId}</h3>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Port-Readable Clearance Proof – Verified on Hedera</p>
+                  <h3 className="font-heading font-bold text-foreground text-sm">Port Trust Receipt - {receipt.shipmentId}</h3>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Port-Readable Clearance Proof - Verified on Hedera</p>
                 </div>
-                <button onClick={() => setReceiptModal(null)} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+                <button onClick={() => setReceiptModal(null)} className="text-muted-foreground hover:text-foreground">
+                  <X className="h-4 w-4" />
+                </button>
               </div>
               <div className="p-4">
                 <PortTrustReceipt receipt={receipt} verificationType="carrier" />
@@ -555,37 +433,6 @@ const CarrierPortalPage = () => {
           </div>
         );
       })()}
-
-      {/* ── HashPack Wallet Modal ── */}
-      {walletModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setWalletModalOpen(false)}>
-          <div className="bg-card border border-border rounded-xl max-w-sm w-full shadow-elevated p-6 space-y-4" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <h3 className="font-heading font-bold text-foreground text-sm flex items-center gap-2">
-                <Wallet className="h-4 w-4 text-accent" /> Connect HashPack Wallet
-              </h3>
-              <button onClick={() => setWalletModalOpen(false)} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              A HashPack wallet is required to sign and pay for pre-clearance requests on the Hedera network.
-            </p>
-            <button
-              onClick={handleConnectWallet}
-              disabled={walletConnecting}
-              className="w-full py-3 rounded-lg border border-accent bg-accent/10 text-accent text-sm font-heading font-bold uppercase tracking-wider hover:bg-accent/20 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              <Wallet className="h-4 w-4" />
-              {walletConnecting ? "Connecting..." : "Connect HashPack"}
-            </button>
-            <p className="text-[10px] text-muted-foreground text-center">
-              Don't have HashPack?{" "}
-              <a href={HASHPACK_URL} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
-                Download extension
-              </a>
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
