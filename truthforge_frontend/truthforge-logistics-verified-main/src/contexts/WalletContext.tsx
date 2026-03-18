@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import {
+  DAppConnector,
+  HederaJsonRpcMethod,
+  HederaSessionEvent,
+  HederaChainId,
+} from '@hashgraph/hedera-wallet-connect';
+import { LedgerId } from '@hiero-ledger/sdk';
 
 export interface WalletInfo {
   address: string;
@@ -13,64 +20,91 @@ interface WalletContextType {
   disconnectWallet: () => void;
 }
 
+const WC_PROJECT_ID = 'b0d4a8b7c3e2f1a9d6e5c4b3a2f1e0d9';
+const APP_METADATA = {
+  name: 'TruthForge',
+  description: 'Logistics verification platform on Hedera',
+  icons: [`${typeof window !== 'undefined' ? window.location.origin : ''}/favicon.ico`],
+  url: typeof window !== 'undefined' ? window.location.origin : 'https://truthforge.app',
+};
+
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
 
 export const useWallet = () => {
   const context = useContext(WalletContext);
-  if (!context) {
-    throw new Error('useWallet must be used within a WalletProvider');
-  }
+  if (!context) throw new Error('useWallet must be used within a WalletProvider');
   return context;
 };
 
 export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [wallet, setWallet] = useState<WalletInfo | null>(null);
+  const connectorRef = useRef<DAppConnector | null>(null);
+  const initializedRef = useRef(false);
 
-  // Load wallet from localStorage on mount
   useEffect(() => {
-    const storedWallet = localStorage.getItem('truthforge_wallet');
-    if (storedWallet) {
-      try {
-        setWallet(JSON.parse(storedWallet));
-      } catch (e) {
-        localStorage.removeItem('truthforge_wallet');
-      }
+    const stored = localStorage.getItem('truthforge_wallet');
+    if (stored) {
+      try { setWallet(JSON.parse(stored)); } catch { localStorage.removeItem('truthforge_wallet'); }
     }
   }, []);
 
   const connectWallet = async (): Promise<boolean> => {
-    // Mock wallet connection - in production, this would integrate with HashPack or other Hedera wallets
     try {
-      // Simulate wallet connection delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock wallet info
-      const mockWallet: WalletInfo = {
-        address: '0.0.123456',
-        network: 'testnet',
-        connected: true,
-      };
-      
-      setWallet(mockWallet);
-      localStorage.setItem('truthforge_wallet', JSON.stringify(mockWallet));
-      return true;
-    } catch (error) {
-      console.error('Failed to connect wallet:', error);
+      if (!connectorRef.current || !initializedRef.current) {
+        const connector = new DAppConnector(
+          APP_METADATA,
+          LedgerId.TESTNET,
+          WC_PROJECT_ID,
+          Object.values(HederaJsonRpcMethod),
+          [HederaSessionEvent.ChainChanged, HederaSessionEvent.AccountsChanged],
+          [HederaChainId.Testnet],
+        );
+        await connector.init({ logger: 'error' });
+        connectorRef.current = connector;
+        initializedRef.current = true;
+      }
+      await connectorRef.current.openModal();
+      const sessions = connectorRef.current.walletConnectClient?.session.getAll() ?? [];
+      const latest = sessions[sessions.length - 1];
+      const accountId =
+        latest?.namespaces?.hedera?.accounts?.[0]?.split(':')?.[2] ??
+        latest?.namespaces?.['hedera:testnet']?.accounts?.[0]?.split(':')?.[2] ?? null;
+      if (accountId) {
+        const info: WalletInfo = { address: accountId, network: 'testnet', connected: true };
+        setWallet(info);
+        localStorage.setItem('truthforge_wallet', JSON.stringify(info));
+        return true;
+      }
+      return false;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!msg.toLowerCase().includes('modal closed') && !msg.toLowerCase().includes('user rejected')) {
+        console.error('Wallet connect error:', err);
+      }
       return false;
     }
   };
 
-  const disconnectWallet = () => {
+  const disconnectWallet = async () => {
+    try {
+      if (connectorRef.current) {
+        await connectorRef.current.disconnectAll();
+        connectorRef.current = null;
+        initializedRef.current = false;
+      }
+    } catch { /* ignore */ }
     setWallet(null);
     localStorage.removeItem('truthforge_wallet');
   };
 
-  const value: WalletContextType = {
-    wallet,
-    isWalletConnected: wallet?.connected || false,
-    connectWallet,
-    disconnectWallet,
-  };
-
-  return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;
+  return (
+    <WalletContext.Provider value={{
+      wallet,
+      isWalletConnected: wallet?.connected ?? false,
+      connectWallet,
+      disconnectWallet,
+    }}>
+      {children}
+    </WalletContext.Provider>
+  );
 };
