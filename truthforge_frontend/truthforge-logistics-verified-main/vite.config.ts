@@ -2,30 +2,20 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
-// https://vitejs.dev/config/
 export default defineConfig({
   server: {
     host: "::",
     port: 8080,
-    hmr: {
-      overlay: false,
-    },
+    hmr: { overlay: false },
     proxy: {
-      '/api': {
-        target: 'http://localhost:5000',
-        changeOrigin: true,
-      },
-      '/webhook': {
-        target: 'http://localhost:5000',
-        changeOrigin: true,
-      },
+      '/api': { target: 'http://localhost:5000', changeOrigin: true },
+      '/webhook': { target: 'http://localhost:5000', changeOrigin: true },
     },
   },
   plugins: [react()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      // Node polyfills required by WalletConnect / hedera-wallet-connect
       buffer: "buffer",
       process: "process/browser",
       util: "util",
@@ -34,26 +24,13 @@ export default defineConfig({
     },
   },
   define: {
-    // Required by WalletConnect internals
     global: "globalThis",
   },
   optimizeDeps: {
-    include: [
-      "buffer",
-      "process",
-      "@walletconnect/core",
-      "@walletconnect/sign-client",
-      "@walletconnect/types",
-      "@walletconnect/utils",
-      "@walletconnect/universal-provider",
-      "@walletconnect/modal",
-    ],
+    // Only pre-bundle Node polyfills — wallet-connect is loaded dynamically
+    include: ["buffer", "process"],
   },
   build: {
-    rollupOptions: {
-      // Ensure walletconnect packages are bundled, not treated as external
-      external: [],
-    },
     commonjsOptions: {
       transformMixedEsModules: true,
     },

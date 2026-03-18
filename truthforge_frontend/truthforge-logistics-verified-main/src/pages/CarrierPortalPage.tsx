@@ -11,13 +11,9 @@ import CarrierVerificationPanel, { VerificationResult, TransportMode } from "@/c
 import PortTrustReceipt from "@/components/PortTrustReceipt";
 import CarrierProcessingTimeline, { CarrierTimelineData } from "@/components/CarrierProcessingTimeline";
 import { useToast } from "@/hooks/use-toast";
-import {
-  DAppConnector,
-  HederaJsonRpcMethod,
-  HederaSessionEvent,
-  HederaChainId,
-} from "@hashgraph/hedera-wallet-connect";
-import { LedgerId } from "@hiero-ledger/sdk";
+// hedera-wallet-connect loaded dynamically to avoid Rollup static-analysis errors
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyConnector = any;
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const RAILWAY = "https://web-production-dcd43.up.railway.app";
@@ -71,7 +67,7 @@ const CarrierPortalPage = () => {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [walletModalOpen, setWalletModalOpen] = useState(false);
   const [walletConnecting, setWalletConnecting] = useState(false);
-  const dAppConnectorRef = useRef<DAppConnector | null>(null);
+  const dAppConnectorRef = useRef<AnyConnector>(null);
   const connectorInitialized = useRef(false);
 
   // Verification / shipments
@@ -149,6 +145,11 @@ const CarrierPortalPage = () => {
     setWalletConnecting(true);
     try {
       if (!dAppConnectorRef.current || !connectorInitialized.current) {
+        const [hwc, { LedgerId }] = await Promise.all([
+          import('@hashgraph/hedera-wallet-connect'),
+          import('@hiero-ledger/sdk'),
+        ]);
+        const { DAppConnector, HederaJsonRpcMethod, HederaSessionEvent, HederaChainId } = hwc;
         const connector = new DAppConnector(
           HC_APP_METADATA, LedgerId.TESTNET, WC_PROJECT_ID,
           Object.values(HederaJsonRpcMethod),

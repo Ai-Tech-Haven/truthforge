@@ -1,0 +1,1 @@
+fix: dynamic import hedera-wallet-connect in CarrierPortalPage and MerchantPortalPage to prevent Rollup static-analysis build failure on Vercel

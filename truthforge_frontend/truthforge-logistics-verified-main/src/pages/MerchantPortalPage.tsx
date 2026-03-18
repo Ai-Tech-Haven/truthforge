@@ -9,13 +9,9 @@ import {
 import PortTrustReceipt from "@/components/PortTrustReceipt";
 import OrderClearanceTimeline, { ClearanceStepData } from "@/components/OrderClearanceTimeline";
 import { useToast } from "@/hooks/use-toast";
-import {
-  DAppConnector,
-  HederaJsonRpcMethod,
-  HederaSessionEvent,
-  HederaChainId,
-} from "@hashgraph/hedera-wallet-connect";
-import { LedgerId } from "@hiero-ledger/sdk";
+// hedera-wallet-connect loaded dynamically to avoid Rollup static-analysis errors
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyConnector = any;
 
 const RAILWAY = "https://web-production-dcd43.up.railway.app";
 const ATHI_LOGO = "https://a-thi.online/wp-content/uploads/2024/01/cropped-a-thi-logo-192x192.png";
@@ -74,7 +70,7 @@ const MerchantPortalPage = () => {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [walletModalOpen, setWalletModalOpen] = useState(false);
   const [walletConnecting, setWalletConnecting] = useState(false);
-  const dAppConnectorRef = useRef<DAppConnector | null>(null);
+  const dAppConnectorRef = useRef<AnyConnector>(null);
   const connectorInitialized = useRef(false);
 
   // Carrier / pre-clearance
@@ -174,8 +170,13 @@ const MerchantPortalPage = () => {
   const handleConnectWallet = async () => {
     setWalletConnecting(true);
     try {
-      // Initialize DAppConnector once per session
+      // Dynamic import — keeps hedera-wallet-connect out of Rollup's static analysis
       if (!dAppConnectorRef.current || !connectorInitialized.current) {
+        const [hwc, { LedgerId }] = await Promise.all([
+          import('@hashgraph/hedera-wallet-connect'),
+          import('@hiero-ledger/sdk'),
+        ]);
+        const { DAppConnector, HederaJsonRpcMethod, HederaSessionEvent, HederaChainId } = hwc;
         const connector = new DAppConnector(
           HC_APP_METADATA,
           LedgerId.TESTNET,
