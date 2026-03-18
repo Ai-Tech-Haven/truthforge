@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useMockMode } from "@/contexts/MockModeContext";
 import { mockShipments, mockPortTrustReceipts, ShipmentTracking } from "@/lib/mock-data";
 import {
@@ -9,6 +9,13 @@ import {
 import PortTrustReceipt from "@/components/PortTrustReceipt";
 import OrderClearanceTimeline, { ClearanceStepData } from "@/components/OrderClearanceTimeline";
 import { useToast } from "@/hooks/use-toast";
+import {
+  DAppConnector,
+  HederaJsonRpcMethod,
+  HederaSessionEvent,
+  HederaChainId,
+} from "@hashgraph/hedera-wallet-connect";
+import { LedgerId } from "@hiero-ledger/sdk";
 
 const RAILWAY = "https://web-production-dcd43.up.railway.app";
 const ATHI_LOGO = "https://a-thi.online/wp-content/uploads/2024/01/cropped-a-thi-logo-192x192.png";
@@ -34,42 +41,16 @@ const MOCK_MERCHANT: MerchantUser = { name: ATHI_NAME, logoUrl: ATHI_LOGO, siteU
 // ─── HashPack wallet helper ──────────────────────────────────────────────────
 const HASHPACK_EXTENSION_URL = "https://www.hashpack.app/download";
 
-// HashConnect v2 extension injects window.hashconnect
-declare global {
-  interface Window {
-    hashconnect?: {
-      init: (appMetadata: object, network: string, debug?: boolean) => Promise<{ topic: string; pairingString: string; savedPairings: { accountIds: string[] }[] }>;
-      connectToLocalWallet: (pairingString: string) => void;
-      pairingEvent?: { once: (cb: (data: { accountIds: string[] }) => void) => void };
-    };
-  }
-}
+// WalletConnect Project ID — get a free one at https://cloud.walletconnect.com
+// Replace this with your actual project ID for production
+const WC_PROJECT_ID = "b0d4a8b7c3e2f1a9d6e5c4b3a2f1e0d9";
 
-async function connectHashPack(): Promise<string | null> {
-  // HashConnect v2 — talks to the installed Chrome extension
-  if (typeof window !== "undefined" && window.hashconnect) {
-    try {
-      const appMeta = { name: "TruthForge", description: "Logistics verification platform", icon: "https://truthforge.vercel.app/favicon.ico" };
-      const initData = await window.hashconnect.init(appMeta, "testnet", false);
-      // If already paired, return first account
-      if (initData.savedPairings?.length > 0) {
-        const ids = initData.savedPairings[0].accountIds;
-        if (ids?.length > 0) return ids[0];
-      }
-      // Trigger pairing via extension popup
-      window.hashconnect.connectToLocalWallet(initData.pairingString);
-      // Wait for pairing event (up to 60s)
-      return await new Promise<string | null>((resolve) => {
-        const timer = setTimeout(() => resolve(null), 60000);
-        window.hashconnect?.pairingEvent?.once((data) => {
-          clearTimeout(timer);
-          resolve(data?.accountIds?.[0] ?? null);
-        });
-      });
-    } catch { return null; }
-  }
-  return null;
-}
+const HC_APP_METADATA = {
+  name: "TruthForge",
+  description: "Logistics verification platform on Hedera",
+  icons: [`${typeof window !== "undefined" ? window.location.origin : ""}/favicon.ico`],
+  url: typeof window !== "undefined" ? window.location.origin : "https://truthforge.app",
+};
 
 // ─── Mock clearance timeline data per shipment ───────────────────────────────
 const MOCK_TIMELINES: Record<string, ClearanceStepData> = {
@@ -93,6 +74,8 @@ const MerchantPortalPage = () => {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [walletModalOpen, setWalletModalOpen] = useState(false);
   const [walletConnecting, setWalletConnecting] = useState(false);
+  const dAppConnectorRef = useRef<DAppConnector | null>(null);
+  const connectorInitialized = useRef(false);
 
   // Carrier / pre-clearance
   const [selectedCarrier, setSelectedCarrier] = useState("fedex");
@@ -189,25 +172,65 @@ const MerchantPortalPage = () => {
 
   // ── Wallet ──
   const handleConnectWallet = async () => {
-    // If extension not present at all, open download page immediately
-    if (typeof window !== "undefined" && !window.hashconnect) {
-      window.open(HASHPACK_EXTENSION_URL, "_blank");
-      return;
-    }
     setWalletConnecting(true);
-    const addr = await connectHashPack();
-    if (addr) {
-      setWalletAddress(addr);
-      localStorage.setItem("tf_wallet_address", addr);
-      setWalletModalOpen(false);
-      toast({ title: "Wallet connected", description: addr });
-    } else {
-      toast({ title: "Connection timed out", description: "Please approve the pairing request in HashPack.", variant: "destructive" });
+    try {
+      // Initialize DAppConnector once per session
+      if (!dAppConnectorRef.current || !connectorInitialized.current) {
+        const connector = new DAppConnector(
+          HC_APP_METADATA,
+          LedgerId.TESTNET,
+          WC_PROJECT_ID,
+          Object.values(HederaJsonRpcMethod),
+          [HederaSessionEvent.ChainChanged, HederaSessionEvent.AccountsChanged],
+          [HederaChainId.Testnet],
+        );
+        await connector.init({ logger: "error" });
+        dAppConnectorRef.current = connector;
+        connectorInitialized.current = true;
+      }
+
+      // openModal() triggers the HashPack extension popup directly,
+      // or shows a WalletConnect QR modal for mobile wallets.
+      await dAppConnectorRef.current.openModal();
+
+      // After modal closes, grab the connected account from the active session
+      const sessions = dAppConnectorRef.current.walletConnectClient?.session.getAll() ?? [];
+      const latestSession = sessions[sessions.length - 1];
+      const accountId =
+        latestSession?.namespaces?.hedera?.accounts?.[0]?.split(":")?.[2] ??
+        latestSession?.namespaces?.["hedera:testnet"]?.accounts?.[0]?.split(":")?.[2] ??
+        null;
+
+      if (accountId) {
+        setWalletAddress(accountId);
+        localStorage.setItem("tf_wallet_address", accountId);
+        setWalletModalOpen(false);
+        toast({ title: "Wallet connected", description: accountId });
+      } else {
+        toast({ title: "No account found", description: "Please approve the connection in HashPack.", variant: "destructive" });
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.toLowerCase().includes("modal closed") || msg.toLowerCase().includes("user rejected")) {
+        // user just closed the modal — not an error
+      } else {
+        console.error("DAppConnector error:", err);
+        window.open(HASHPACK_EXTENSION_URL, "_blank");
+        toast({ title: "Could not connect", description: "Please install HashPack and try again.", variant: "destructive" });
+      }
+    } finally {
+      setWalletConnecting(false);
     }
-    setWalletConnecting(false);
   };
 
-  const handleDisconnectWallet = () => {
+  const handleDisconnectWallet = async () => {
+    try {
+      if (dAppConnectorRef.current) {
+        await dAppConnectorRef.current.disconnectAll();
+        dAppConnectorRef.current = null;
+        connectorInitialized.current = false;
+      }
+    } catch { /* ignore */ }
     setWalletAddress(null);
     localStorage.removeItem("tf_wallet_address");
     toast({ title: "Wallet disconnected" });

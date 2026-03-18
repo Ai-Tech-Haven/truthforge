@@ -10,7 +10,6 @@ export default defineConfig({
     hmr: {
       overlay: false,
     },
-    // Proxy API calls to backend in local dev (production uses VITE_API_URL)
     proxy: {
       '/api': {
         target: 'http://localhost:5000',
@@ -26,6 +25,19 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Node polyfills required by WalletConnect / hedera-wallet-connect
+      buffer: "buffer",
+      process: "process/browser",
+      util: "util",
+      stream: "stream-browserify",
+      events: "events",
     },
+  },
+  define: {
+    // Required by WalletConnect internals
+    global: "globalThis",
+  },
+  optimizeDeps: {
+    include: ["buffer", "process"],
   },
 });

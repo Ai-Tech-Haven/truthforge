@@ -62,7 +62,12 @@
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.9",
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "hashconnect": "^3.0.0",
+    "@hashgraph/sdk": "^2.50.0",
+    "@hashgraph/hedera-wallet-connect": "^2.0.0",
+    "@hiero-ledger/sdk": "^2.0.0",
+    "@walletconnect/modal": "^2.7.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
