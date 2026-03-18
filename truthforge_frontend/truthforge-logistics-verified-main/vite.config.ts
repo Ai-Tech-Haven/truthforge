@@ -16,19 +16,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      buffer: "buffer",
-      process: "process/browser",
-      util: "util",
-      stream: "stream-browserify",
-      events: "events",
     },
-  },
-  define: {
-    global: "globalThis",
-  },
-  optimizeDeps: {
-    // Only pre-bundle Node polyfills — wallet-connect is loaded dynamically
-    include: ["buffer", "process"],
   },
   build: {
     commonjsOptions: {

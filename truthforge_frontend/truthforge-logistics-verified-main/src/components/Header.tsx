@@ -3,11 +3,10 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Switch } from "@/components/ui/switch";
 import { useMockMode } from "@/contexts/MockModeContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { useWallet } from "@/contexts/WalletContext";
 import logo from "@/assets/truthforge-logo.png";
 import {
-  Database, Sun, Moon, ChevronDown, Wallet, Anchor, BarChart3,
-  FileText, Cpu, Plug, HelpCircle, LogOut, Building2, Package,
+  Database, Sun, Moon, ChevronDown, Anchor, BarChart3,
+  FileText, Cpu, Plug, HelpCircle, Building2, Package,
   Ship, X, BookOpen, Code, MessageSquare,
 } from "lucide-react";
 
@@ -173,69 +172,6 @@ const HelpModal = ({ onClose }: { onClose: () => void }) => (
   </div>
 );
 
-// ─── Wallet Status ────────────────────────────────────────────────────────────
-
-const WalletStatus = () => {
-  const { wallet, isWalletConnected, connectWallet, disconnectWallet } = useWallet();
-  const location = useLocation();
-  const [hover, setHover] = useState(false);
-  const [connecting, setConnecting] = useState(false);
-
-  const isPortalPage = ["/merchant", "/carrier"].includes(location.pathname);
-  if (!isPortalPage) return null;
-
-  const roleLabel = location.pathname === "/merchant" ? "Merchant" : "Carrier";
-
-  const handleConnect = async () => {
-    setConnecting(true);
-    await connectWallet();
-    setConnecting(false);
-  };
-
-  if (!isWalletConnected) {
-    return (
-      <button
-        onClick={handleConnect}
-        disabled={connecting}
-        className="flex items-center gap-1.5 px-3 h-8 rounded border border-accent/40 bg-accent/10 text-accent text-xs font-bold uppercase tracking-wider hover:bg-accent/20 transition-colors disabled:opacity-50"
-      >
-        <Wallet className="h-3.5 w-3.5" />
-        <span className="hidden sm:inline">{connecting ? "Connecting..." : "Connect Wallet"}</span>
-      </button>
-    );
-  }
-
-  return (
-    <div
-      className="relative"
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-    >
-      <div className="flex items-center gap-1.5 px-3 h-8 rounded border border-success/40 bg-success/10 text-success text-xs font-bold cursor-pointer">
-        <Wallet className="h-3.5 w-3.5" />
-        <span className="hidden sm:inline">Wallet — {wallet?.address}</span>
-      </div>
-      {hover && (
-        <div className="absolute top-full right-0 mt-1.5 w-56 rounded-md border border-white/10 bg-[#0b1f33] shadow-lg z-[9999] p-3 space-y-2">
-          <div className="text-[10px] text-slate-400 uppercase tracking-wider">Network</div>
-          <div className="text-xs text-white font-medium">Hedera Testnet</div>
-          <div className="text-[10px] text-slate-400 uppercase tracking-wider mt-2">Role</div>
-          <div className="text-xs text-white font-medium">{roleLabel}</div>
-          <div className="text-[10px] text-slate-400 uppercase tracking-wider mt-2">Account</div>
-          <div className="text-xs font-mono text-accent">{wallet?.address}</div>
-          <button
-            onClick={disconnectWallet}
-            className="w-full mt-2 flex items-center gap-1.5 px-2 py-1.5 rounded border border-destructive/30 bg-destructive/10 text-destructive text-xs font-medium hover:bg-destructive/20 transition-colors"
-          >
-            <LogOut className="h-3 w-3" />
-            Disconnect
-          </button>
-        </div>
-      )}
-    </div>
-  );
-};
-
 // ─── Header ───────────────────────────────────────────────────────────────────
 
 const Header = () => {
@@ -344,7 +280,6 @@ const Header = () => {
 
           {/* Right Controls */}
           <div className="flex items-center gap-2 shrink-0">
-            <WalletStatus />
 
             <button
               onClick={toggleTheme}

@@ -1,17 +1,14 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useMockMode } from "@/contexts/MockModeContext";
 import { mockShipments, mockPortTrustReceipts, ShipmentTracking } from "@/lib/mock-data";
 import {
   Package, ChevronDown, CheckCircle, Clock, AlertTriangle,
-  Wallet, Shield, Zap, ToggleLeft, ToggleRight, LogOut, LogIn,
+  Shield, Zap, ToggleLeft, ToggleRight, LogOut, LogIn,
   ExternalLink, RefreshCw, X
 } from "lucide-react";
 import PortTrustReceipt from "@/components/PortTrustReceipt";
 import OrderClearanceTimeline, { ClearanceStepData } from "@/components/OrderClearanceTimeline";
 import { useToast } from "@/hooks/use-toast";
-// hedera-wallet-connect loaded dynamically to avoid Rollup static-analysis errors
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyConnector = any;
 
 const RAILWAY = "https://web-production-dcd43.up.railway.app";
 const ATHI_LOGO = "https://a-thi.online/wp-content/uploads/2024/01/cropped-a-thi-logo-192x192.png";
@@ -22,33 +19,16 @@ type ClearanceMode = "auto" | "manual";
 type PreClearanceState = "none" | "pending" | "cleared" | "flagged";
 
 const CARRIERS = [
-  { id: "fedex", label: "FedEx", available: true },
-  { id: "ups",   label: "UPS",   available: false },
-  { id: "msc",   label: "MSC",   available: false },
-  { id: "dhl",   label: "DHL",   available: false },
-  { id: "maersk",label: "Maersk",available: false },
+  { id: "fedex",  label: "FedEx",  available: true },
+  { id: "ups",    label: "UPS",    available: false },
+  { id: "msc",    label: "MSC",    available: false },
+  { id: "dhl",    label: "DHL",    available: false },
+  { id: "maersk", label: "Maersk", available: false },
 ];
 
-// ─── Merchant user widget ────────────────────────────────────────────────────
 interface MerchantUser { name: string; logoUrl: string; siteUrl: string }
-
 const MOCK_MERCHANT: MerchantUser = { name: ATHI_NAME, logoUrl: ATHI_LOGO, siteUrl: ATHI_URL };
 
-// ─── HashPack wallet helper ──────────────────────────────────────────────────
-const HASHPACK_EXTENSION_URL = "https://www.hashpack.app/download";
-
-// WalletConnect Project ID — get a free one at https://cloud.walletconnect.com
-// Replace this with your actual project ID for production
-const WC_PROJECT_ID = "b0d4a8b7c3e2f1a9d6e5c4b3a2f1e0d9";
-
-const HC_APP_METADATA = {
-  name: "TruthForge",
-  description: "Logistics verification platform on Hedera",
-  icons: [`${typeof window !== "undefined" ? window.location.origin : ""}/favicon.ico`],
-  url: typeof window !== "undefined" ? window.location.origin : "https://truthforge.app",
-};
-
-// ─── Mock clearance timeline data per shipment ───────────────────────────────
 const MOCK_TIMELINES: Record<string, ClearanceStepData> = {
   "SHP-8821A": { order_received: true, carrier_confirmed: true, agents_verified: true, payment_confirmed: true, pre_cleared: true },
   "SHP-8822B": { order_received: true, carrier_confirmed: true, agents_verified: false },
@@ -56,24 +36,14 @@ const MOCK_TIMELINES: Record<string, ClearanceStepData> = {
   "SHP-8824D": { order_received: true, carrier_confirmed: true, agents_verified: true, payment_confirmed: true, pre_cleared: true },
 };
 
-// ─── Main component ──────────────────────────────────────────────────────────
 const MerchantPortalPage = () => {
   const { isMockMode } = useMockMode();
   const { toast } = useToast();
 
-  // Merchant auth
   const [merchant, setMerchant] = useState<MerchantUser | null>(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
 
-  // Wallet
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [walletModalOpen, setWalletModalOpen] = useState(false);
-  const [walletConnecting, setWalletConnecting] = useState(false);
-  const dAppConnectorRef = useRef<AnyConnector>(null);
-  const connectorInitialized = useRef(false);
-
-  // Carrier / pre-clearance
   const [selectedCarrier, setSelectedCarrier] = useState("fedex");
   const [carrierDropdownOpen, setCarrierDropdownOpen] = useState(false);
   const [clearanceMode, setClearanceMode] = useState<ClearanceMode>("auto");
@@ -81,22 +51,17 @@ const MerchantPortalPage = () => {
   const [pendingConfirm, setPendingConfirm] = useState<string | null>(null);
   const [receiptModal, setReceiptModal] = useState<string | null>(null);
 
-  // Live carrier status
   const [carrierStatus, setCarrierStatus] = useState<"connected" | "disconnected" | "loading">("loading");
   const [liveShipments, setLiveShipments] = useState<ShipmentTracking[]>([]);
   const [shipmentsLoading, setShipmentsLoading] = useState(false);
 
   const selectedCarrierLabel = CARRIERS.find(c => c.id === selectedCarrier)?.label ?? "FedEx";
 
-  // ── Load persisted merchant/wallet ──
   useEffect(() => {
     const stored = localStorage.getItem("tf_merchant");
     if (stored) { try { setMerchant(JSON.parse(stored)); } catch { localStorage.removeItem("tf_merchant"); } }
-    const storedWallet = localStorage.getItem("tf_wallet_address");
-    if (storedWallet) setWalletAddress(storedWallet);
   }, []);
 
-  // ── Mock: seed merchant on mount ──
   useEffect(() => {
     if (isMockMode && !merchant) {
       setMerchant(MOCK_MERCHANT);
@@ -104,7 +69,6 @@ const MerchantPortalPage = () => {
     }
   }, [isMockMode, merchant]);
 
-  // ── Live carrier status check ──
   const checkCarrierStatus = useCallback(async () => {
     if (isMockMode) { setCarrierStatus("connected"); return; }
     try {
@@ -113,16 +77,12 @@ const MerchantPortalPage = () => {
     } catch { setCarrierStatus("disconnected"); }
   }, [isMockMode, selectedCarrier]);
 
-  // ── Live shipments fetch ──
   const fetchLiveShipments = useCallback(async () => {
     if (isMockMode) return;
     setShipmentsLoading(true);
     try {
       const res = await fetch(`${RAILWAY}/api/clearance/queue`, { signal: AbortSignal.timeout(8000) });
-      if (res.ok) {
-        const data = await res.json();
-        setLiveShipments(data.shipments ?? []);
-      }
+      if (res.ok) { const data = await res.json(); setLiveShipments(data.shipments ?? []); }
     } catch { /* keep empty */ }
     finally { setShipmentsLoading(false); }
   }, [isMockMode]);
@@ -134,7 +94,6 @@ const MerchantPortalPage = () => {
 
   const shipments = isMockMode ? mockShipments : liveShipments;
 
-  // ── Auth ──
   const handleSignIn = async () => {
     setAuthLoading(true);
     try {
@@ -150,7 +109,6 @@ const MerchantPortalPage = () => {
       localStorage.setItem("tf_merchant", JSON.stringify(m));
       toast({ title: "Signed in", description: `Welcome, ${m.name}` });
     } catch {
-      // fallback: use known merchant
       setMerchant(MOCK_MERCHANT);
       localStorage.setItem("tf_merchant", JSON.stringify(MOCK_MERCHANT));
       toast({ title: "Signed in", description: `Welcome, ${MOCK_MERCHANT.name}` });
@@ -166,83 +124,10 @@ const MerchantPortalPage = () => {
     toast({ title: "Signed out" });
   };
 
-  // ── Wallet ──
-  const handleConnectWallet = async () => {
-    setWalletConnecting(true);
-    try {
-      // Dynamic import — keeps hedera-wallet-connect out of Rollup's static analysis
-      if (!dAppConnectorRef.current || !connectorInitialized.current) {
-        const [hwc, { LedgerId }] = await Promise.all([
-          import('@hashgraph/hedera-wallet-connect'),
-          import('@hiero-ledger/sdk'),
-        ]);
-        const { DAppConnector, HederaJsonRpcMethod, HederaSessionEvent, HederaChainId } = hwc;
-        const connector = new DAppConnector(
-          HC_APP_METADATA,
-          LedgerId.TESTNET,
-          WC_PROJECT_ID,
-          Object.values(HederaJsonRpcMethod),
-          [HederaSessionEvent.ChainChanged, HederaSessionEvent.AccountsChanged],
-          [HederaChainId.Testnet],
-        );
-        await connector.init({ logger: "error" });
-        dAppConnectorRef.current = connector;
-        connectorInitialized.current = true;
-      }
-
-      // openModal() triggers the HashPack extension popup directly,
-      // or shows a WalletConnect QR modal for mobile wallets.
-      await dAppConnectorRef.current.openModal();
-
-      // After modal closes, grab the connected account from the active session
-      const sessions = dAppConnectorRef.current.walletConnectClient?.session.getAll() ?? [];
-      const latestSession = sessions[sessions.length - 1];
-      const accountId =
-        latestSession?.namespaces?.hedera?.accounts?.[0]?.split(":")?.[2] ??
-        latestSession?.namespaces?.["hedera:testnet"]?.accounts?.[0]?.split(":")?.[2] ??
-        null;
-
-      if (accountId) {
-        setWalletAddress(accountId);
-        localStorage.setItem("tf_wallet_address", accountId);
-        setWalletModalOpen(false);
-        toast({ title: "Wallet connected", description: accountId });
-      } else {
-        toast({ title: "No account found", description: "Please approve the connection in HashPack.", variant: "destructive" });
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg.toLowerCase().includes("modal closed") || msg.toLowerCase().includes("user rejected")) {
-        // user just closed the modal — not an error
-      } else {
-        console.error("DAppConnector error:", err);
-        window.open(HASHPACK_EXTENSION_URL, "_blank");
-        toast({ title: "Could not connect", description: "Please install HashPack and try again.", variant: "destructive" });
-      }
-    } finally {
-      setWalletConnecting(false);
-    }
-  };
-
-  const handleDisconnectWallet = async () => {
-    try {
-      if (dAppConnectorRef.current) {
-        await dAppConnectorRef.current.disconnectAll();
-        dAppConnectorRef.current = null;
-        connectorInitialized.current = false;
-      }
-    } catch { /* ignore */ }
-    setWalletAddress(null);
-    localStorage.removeItem("tf_wallet_address");
-    toast({ title: "Wallet disconnected" });
-  };
-
-  // ── Pre-clearance ──
   const getShipmentState = (id: string): PreClearanceState =>
     preClearanceStates[id] ?? (mockPortTrustReceipts.find(r => r.shipmentId === id) ? "cleared" : "none");
 
   const requestPreClearance = async (shipment: ShipmentTracking) => {
-    if (!walletAddress) { setWalletModalOpen(true); return; }
     if (clearanceMode === "manual" && pendingConfirm !== shipment.id) { setPendingConfirm(shipment.id); return; }
     setPendingConfirm(null);
     setPreClearanceStates(s => ({ ...s, [shipment.id]: "pending" }));
@@ -256,7 +141,7 @@ const MerchantPortalPage = () => {
         const res = await fetch(`${RAILWAY}/api/v1/shipments/${shipment.id}/pre-clearance`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ carrier: selectedCarrier, wallet: walletAddress, mode: clearanceMode }),
+          body: JSON.stringify({ carrier: selectedCarrier, mode: clearanceMode }),
           signal: AbortSignal.timeout(10000),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -303,7 +188,7 @@ const MerchantPortalPage = () => {
           </div>
         </div>
 
-        {/* ── Merchant User Widget ── */}
+        {/* Merchant User Widget */}
         <div className="relative">
           {merchant ? (
             <>
@@ -349,7 +234,7 @@ const MerchantPortalPage = () => {
         </div>
       </div>
 
-      {/* ── Controls Row: Carrier Card + Pre-Clearance Toggle ── */}
+      {/* ── Controls Row ── */}
       <div className="flex flex-wrap items-stretch gap-3">
         {/* Carrier Card */}
         <div className="rounded-xl border border-[hsl(213_50%_22%)] bg-[hsl(213_40%_14%)] p-4 flex flex-col gap-2 min-w-[200px]">
@@ -416,36 +301,6 @@ const MerchantPortalPage = () => {
               ? "Shipments auto-submit to backend when ready."
               : "Each request requires your confirmation."}
           </p>
-        </div>
-
-        {/* Wallet Card */}
-        <div className="rounded-xl border border-[hsl(213_50%_22%)] bg-[hsl(213_40%_14%)] p-4 flex flex-col gap-2 min-w-[200px]">
-          <span className="text-[10px] font-heading font-bold text-white/60 uppercase tracking-wider">HashPack Wallet</span>
-          {walletAddress ? (
-            <>
-              <div className="flex items-center gap-2">
-                <Wallet className="h-4 w-4 text-success" />
-                <span className="font-mono text-xs text-success truncate">{walletAddress}</span>
-              </div>
-              <button onClick={handleDisconnectWallet} className="text-[10px] text-white/40 hover:text-destructive transition-colors text-left">
-                Disconnect wallet
-              </button>
-            </>
-          ) : (
-            <>
-              <div className="flex items-center gap-2 text-white/60">
-                <Wallet className="h-4 w-4" />
-                <span className="text-xs text-white">No wallet connected</span>
-              </div>
-              <button
-                onClick={() => setWalletModalOpen(true)}
-                className="px-3 py-1.5 rounded border border-accent bg-accent/10 text-accent text-[10px] font-heading font-bold uppercase tracking-wider hover:bg-accent/20 transition-colors"
-              >
-                Connect Wallet
-              </button>
-              <p className="text-[9px] text-warning leading-snug">Required to request pre-clearance</p>
-            </>
-          )}
         </div>
       </div>
 
@@ -535,7 +390,6 @@ const MerchantPortalPage = () => {
                 </div>
               </div>
 
-              {/* Order Clearance Timeline */}
               <OrderClearanceTimeline data={timeline} />
             </div>
           );
@@ -560,37 +414,6 @@ const MerchantPortalPage = () => {
           </div>
         );
       })()}
-
-      {/* ── HashPack Wallet Modal ── */}
-      {walletModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setWalletModalOpen(false)}>
-          <div className="bg-card border border-border rounded-xl max-w-sm w-full shadow-elevated p-6 space-y-4" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <h3 className="font-heading font-bold text-foreground text-sm flex items-center gap-2">
-                <Wallet className="h-4 w-4 text-accent" /> Connect HashPack Wallet
-              </h3>
-              <button onClick={() => setWalletModalOpen(false)} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              A HashPack wallet is required to sign and pay for pre-clearance requests on the Hedera network.
-            </p>
-            <button
-              onClick={handleConnectWallet}
-              disabled={walletConnecting}
-              className="w-full py-3 rounded-lg border border-accent bg-accent/10 text-accent text-sm font-heading font-bold uppercase tracking-wider hover:bg-accent/20 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              <Wallet className="h-4 w-4" />
-              {walletConnecting ? "Connecting..." : "Connect HashPack"}
-            </button>
-            <p className="text-[10px] text-muted-foreground text-center">
-              Don't have HashPack?{" "}
-              <a href={HASHPACK_EXTENSION_URL} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
-                Download extension
-              </a>
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
