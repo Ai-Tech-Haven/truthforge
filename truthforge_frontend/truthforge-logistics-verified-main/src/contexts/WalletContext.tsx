@@ -1,11 +1,4 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import {
-  DAppConnector,
-  HederaJsonRpcMethod,
-  HederaSessionEvent,
-  HederaChainId,
-} from '@hashgraph/hedera-wallet-connect';
-import { LedgerId } from '@hiero-ledger/sdk';
 
 export interface WalletInfo {
   address: string;
@@ -28,6 +21,9 @@ const APP_METADATA = {
   url: typeof window !== 'undefined' ? window.location.origin : 'https://truthforge.app',
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyConnector = any;
+
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
 
 export const useWallet = () => {
@@ -38,7 +34,7 @@ export const useWallet = () => {
 
 export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [wallet, setWallet] = useState<WalletInfo | null>(null);
-  const connectorRef = useRef<DAppConnector | null>(null);
+  const connectorRef = useRef<AnyConnector>(null);
   const initializedRef = useRef(false);
 
   useEffect(() => {
@@ -51,6 +47,14 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const connectWallet = async (): Promise<boolean> => {
     try {
       if (!connectorRef.current || !initializedRef.current) {
+        // Dynamic import — keeps hedera-wallet-connect out of Rollup's static analysis
+        const [hwc, { LedgerId }] = await Promise.all([
+          import('@hashgraph/hedera-wallet-connect'),
+          import('@hiero-ledger/sdk'),
+        ]);
+
+        const { DAppConnector, HederaJsonRpcMethod, HederaSessionEvent, HederaChainId } = hwc;
+
         const connector = new DAppConnector(
           APP_METADATA,
           LedgerId.TESTNET,
@@ -63,12 +67,15 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         connectorRef.current = connector;
         initializedRef.current = true;
       }
+
       await connectorRef.current.openModal();
+
       const sessions = connectorRef.current.walletConnectClient?.session.getAll() ?? [];
       const latest = sessions[sessions.length - 1];
       const accountId =
         latest?.namespaces?.hedera?.accounts?.[0]?.split(':')?.[2] ??
         latest?.namespaces?.['hedera:testnet']?.accounts?.[0]?.split(':')?.[2] ?? null;
+
       if (accountId) {
         const info: WalletInfo = { address: accountId, network: 'testnet', connected: true };
         setWallet(info);
