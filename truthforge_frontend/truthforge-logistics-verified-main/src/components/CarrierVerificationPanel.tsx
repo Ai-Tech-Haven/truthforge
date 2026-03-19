@@ -27,6 +27,8 @@ export interface CargoItem {
 
 interface CarrierVerificationPanelProps {
   onVerified?: (result: VerificationResult) => void;
+  disabled?: boolean;
+  loadingLabel?: string;
 }
 
 const DOC_TYPES: Record<TransportMode, { value: string; label: string }[]> = {
@@ -83,7 +85,7 @@ const MOCK_RESULTS: Record<TransportMode, VerificationResult> = {
   },
 };
 
-const CarrierVerificationPanel = ({ onVerified }: CarrierVerificationPanelProps) => {
+const CarrierVerificationPanel = ({ onVerified, disabled: externalDisabled, loadingLabel }: CarrierVerificationPanelProps) => {
   const { isMockMode } = useMockMode();
   const { toast } = useToast();
 
@@ -279,11 +281,11 @@ const CarrierVerificationPanel = ({ onVerified }: CarrierVerificationPanelProps)
 
           <button
             onClick={handleSubmit}
-            disabled={isSubmitting}
+            disabled={isSubmitting || externalDisabled}
             className="w-full py-3 rounded-lg border border-accent bg-accent/10 text-accent text-sm font-heading font-bold uppercase tracking-wider hover:bg-accent/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {isSubmitting ? (
-              <><RefreshCw className="h-4 w-4 animate-spin" /> Verifying...</>
+            {(isSubmitting || externalDisabled) ? (
+              <><RefreshCw className="h-4 w-4 animate-spin" /> {loadingLabel ?? "Verifying..."}</>
             ) : (
               <><Upload className="h-4 w-4" /> Upload & Verify Shipment</>
             )}
