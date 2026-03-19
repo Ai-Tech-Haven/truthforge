@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Switch } from "@/components/ui/switch";
 import { useMockMode } from "@/contexts/MockModeContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import WalletConnectCard from "@/components/WalletConnectCard";
 import logo from "@/assets/truthforge-logo.png";
 import {
   Database, Sun, Moon, ChevronDown, Anchor, BarChart3,
@@ -288,6 +289,8 @@ const Header = () => {
             >
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
+
+            <WalletConnectCard />
 
             <div className={`flex items-center gap-2 px-3 h-8 rounded border text-xs font-bold tracking-wide uppercase ${
               isMockMode
