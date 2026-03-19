@@ -101,3 +101,6 @@ TruthForge Logo.png
 _*.cjs
 _*.txt
 _*_out.txt
+
+.next/
+.vercel/
