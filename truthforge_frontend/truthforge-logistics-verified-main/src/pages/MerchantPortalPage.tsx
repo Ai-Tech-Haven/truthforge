@@ -4,7 +4,7 @@ import { mockShipments, mockPortTrustReceipts, ShipmentTracking } from "@/lib/mo
 import {
   Package, ChevronDown, CheckCircle, Clock, AlertTriangle,
   Shield, Zap, ToggleLeft, ToggleRight, LogOut, LogIn,
-  ExternalLink, RefreshCw, X
+  ExternalLink, RefreshCw, X, CreditCard, Loader2
 } from "lucide-react";
 import PortTrustReceipt from "@/components/PortTrustReceipt";
 import OrderClearanceTimeline, { ClearanceStepData } from "@/components/OrderClearanceTimeline";
@@ -14,9 +14,28 @@ const RAILWAY = "https://web-production-dcd43.up.railway.app";
 const ATHI_LOGO = "https://a-thi.online/wp-content/uploads/2024/01/cropped-a-thi-logo-192x192.png";
 const ATHI_NAME = "a-thi.online";
 const ATHI_URL = "https://a-thi.online";
+const VERIFICATION_FEE_HBAR = 0.24;
 
 type ClearanceMode = "auto" | "manual";
-type PreClearanceState = "none" | "pending" | "cleared" | "flagged";
+
+// Per-shipment payment state machine
+type PaymentPhase =
+  | "idle"           // nothing started
+  | "verifying"      // running verification (both modes)
+  | "verified"       // manual: verified, awaiting payment click
+  | "paying"         // wallet open / tx in flight
+  | "cleared"        // fully done
+  | "flagged";       // verification or payment failed
+
+interface ShipmentState {
+  phase: PaymentPhase;
+  txId?: string;
+  hcsRef?: string;
+  error?: string;
+}
+
+interface MerchantUser { name: string; logoUrl: string; siteUrl: string }
+const MOCK_MERCHANT: MerchantUser = { name: ATHI_NAME, logoUrl: ATHI_LOGO, siteUrl: ATHI_URL };
 
 const CARRIERS = [
   { id: "fedex",  label: "FedEx",  available: true },
@@ -26,9 +45,7 @@ const CARRIERS = [
   { id: "maersk", label: "Maersk", available: false },
 ];
 
-interface MerchantUser { name: string; logoUrl: string; siteUrl: string }
-const MOCK_MERCHANT: MerchantUser = { name: ATHI_NAME, logoUrl: ATHI_LOGO, siteUrl: ATHI_URL };
-
+// ─── Mock helpers ─────────────────────────────────────────────────────────────
 const MOCK_TIMELINES: Record<string, ClearanceStepData> = {
   "SHP-8821A": { order_received: true, carrier_confirmed: true, agents_verified: true, payment_confirmed: true, pre_cleared: true },
   "SHP-8822B": { order_received: true, carrier_confirmed: true, agents_verified: false },
@@ -36,6 +53,25 @@ const MOCK_TIMELINES: Record<string, ClearanceStepData> = {
   "SHP-8824D": { order_received: true, carrier_confirmed: true, agents_verified: true, payment_confirmed: true, pre_cleared: true },
 };
 
+function buildTimeline(
+  shipmentId: string,
+  phase: PaymentPhase,
+  carrierConnected: boolean,
+  isMockMode: boolean,
+): ClearanceStepData {
+  if (isMockMode) return MOCK_TIMELINES[shipmentId] ?? {};
+  return {
+    order_received: true,
+    carrier_confirmed: carrierConnected,
+    agents_verified: phase === "verified" || phase === "paying" || phase === "cleared",
+    payment_pending: phase === "verified",   // manual: awaiting payment click
+    payment_confirmed: phase === "cleared",
+    pre_cleared: phase === "cleared",
+    flagged: phase === "flagged",
+  };
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 const MerchantPortalPage = () => {
   const { isMockMode } = useMockMode();
   const { toast } = useToast();
@@ -47,16 +83,24 @@ const MerchantPortalPage = () => {
   const [selectedCarrier, setSelectedCarrier] = useState("fedex");
   const [carrierDropdownOpen, setCarrierDropdownOpen] = useState(false);
   const [clearanceMode, setClearanceMode] = useState<ClearanceMode>("auto");
-  const [preClearanceStates, setPreClearanceStates] = useState<Record<string, PreClearanceState>>({});
-  const [pendingConfirm, setPendingConfirm] = useState<string | null>(null);
-  const [receiptModal, setReceiptModal] = useState<string | null>(null);
 
+  // Per-shipment state
+  const [shipmentStates, setShipmentStates] = useState<Record<string, ShipmentState>>({});
+
+  const [receiptModal, setReceiptModal] = useState<string | null>(null);
   const [carrierStatus, setCarrierStatus] = useState<"connected" | "disconnected" | "loading">("loading");
   const [liveShipments, setLiveShipments] = useState<ShipmentTracking[]>([]);
   const [shipmentsLoading, setShipmentsLoading] = useState(false);
 
   const selectedCarrierLabel = CARRIERS.find(c => c.id === selectedCarrier)?.label ?? "FedEx";
 
+  const setState = (id: string, patch: Partial<ShipmentState>) =>
+    setShipmentStates(prev => ({ ...prev, [id]: { ...(prev[id] ?? { phase: "idle" }), ...patch } }));
+
+  const getState = (id: string): ShipmentState =>
+    shipmentStates[id] ?? { phase: mockPortTrustReceipts.find(r => r.shipmentId === id) ? "cleared" : "idle" };
+
+  // ── Persist merchant ──
   useEffect(() => {
     const stored = localStorage.getItem("tf_merchant");
     if (stored) { try { setMerchant(JSON.parse(stored)); } catch { localStorage.removeItem("tf_merchant"); } }
@@ -82,7 +126,7 @@ const MerchantPortalPage = () => {
     setShipmentsLoading(true);
     try {
       const res = await fetch(`${RAILWAY}/api/clearance/queue`, { signal: AbortSignal.timeout(8000) });
-      if (res.ok) { const data = await res.json(); setLiveShipments(data.shipments ?? []); }
+      if (res.ok) { const d = await res.json(); setLiveShipments(d.shipments ?? []); }
     } catch { /* keep empty */ }
     finally { setShipmentsLoading(false); }
   }, [isMockMode]);
@@ -93,15 +137,15 @@ const MerchantPortalPage = () => {
   }, [isMockMode, checkCarrierStatus, fetchLiveShipments]);
 
   const shipments = isMockMode ? mockShipments : liveShipments;
+  const receiptForShipment = (id: string) => mockPortTrustReceipts.find(r => r.shipmentId === id);
 
+  // ── Auth ──
   const handleSignIn = async () => {
     setAuthLoading(true);
     try {
       const res = await fetch(`${RAILWAY}/api/merchant/auth`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ site: ATHI_URL }),
-        signal: AbortSignal.timeout(8000),
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ site: ATHI_URL }), signal: AbortSignal.timeout(8000),
       });
       const data = res.ok ? await res.json() : null;
       const m: MerchantUser = data?.merchant ?? MOCK_MERCHANT;
@@ -124,51 +168,126 @@ const MerchantPortalPage = () => {
     toast({ title: "Signed out" });
   };
 
-  const getShipmentState = (id: string): PreClearanceState =>
-    preClearanceStates[id] ?? (mockPortTrustReceipts.find(r => r.shipmentId === id) ? "cleared" : "none");
+  // ── Step 1: Verification (both modes) ──
+  async function runVerification(shipment: ShipmentTracking): Promise<boolean> {
+    if (isMockMode) {
+      await new Promise(r => setTimeout(r, 1000));
+      return shipment.id !== "SHP-8823C"; // SHP-8823C is flagged in mock
+    }
+    try {
+      const res = await fetch(`${RAILWAY}/api/v1/shipments/${shipment.id}/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ carrier: selectedCarrier }),
+        signal: AbortSignal.timeout(10000),
+      });
+      return res.ok;
+    } catch { return false; }
+  }
 
-  const requestPreClearance = async (shipment: ShipmentTracking) => {
-    if (clearanceMode === "manual" && pendingConfirm !== shipment.id) { setPendingConfirm(shipment.id); return; }
-    setPendingConfirm(null);
-    setPreClearanceStates(s => ({ ...s, [shipment.id]: "pending" }));
-
+  // ── Step 2: Payment (explicit user click only) ──
+  async function runPayment(shipment: ShipmentTracking): Promise<{ txId?: string; error?: string; userRejected?: boolean }> {
     if (isMockMode) {
       await new Promise(r => setTimeout(r, 1200));
-      setPreClearanceStates(s => ({ ...s, [shipment.id]: "cleared" }));
-      toast({ title: "Pre-Clearance Approved", description: `${shipment.id} has been pre-cleared on Hedera.` });
-    } else {
-      try {
-        const res = await fetch(`${RAILWAY}/api/v1/shipments/${shipment.id}/pre-clearance`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ carrier: selectedCarrier, mode: clearanceMode }),
-          signal: AbortSignal.timeout(10000),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        setPreClearanceStates(s => ({ ...s, [shipment.id]: "cleared" }));
-        toast({ title: "Pre-Clearance Approved", description: `${shipment.id} pre-cleared via live backend.` });
-      } catch {
-        setPreClearanceStates(s => ({ ...s, [shipment.id]: "flagged" }));
-        toast({ title: "Pre-Clearance Failed", description: "Backend returned an error.", variant: "destructive" });
-      }
+      return { txId: `MOCK-TX-${shipment.id}-${Date.now()}` };
     }
+    // Dynamic import — only runs on explicit user click, never at module load
+    const { submitHederaPayment } = await import("@/lib/hedera-payment");
+    return submitHederaPayment(shipment.id, VERIFICATION_FEE_HBAR);
+  }
+
+  // ── Step 3: Notify backend of txId ──
+  async function notifyBackend(shipmentId: string, txId: string) {
+    if (isMockMode) return;
+    try {
+      await fetch(`${RAILWAY}/api/v1/shipments/${shipmentId}/pre-clearance`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ carrier: selectedCarrier, txId }),
+        signal: AbortSignal.timeout(10000),
+      });
+    } catch { /* non-fatal — UI already updated */ }
+  }
+
+  // ── AUTO MODE: single click → verify → wallet → clear ──
+  const handleAutoPreClearance = async (shipment: ShipmentTracking) => {
+    const s = getState(shipment.id);
+    if (s.phase === "verifying" || s.phase === "paying" || s.phase === "cleared") return;
+
+    setState(shipment.id, { phase: "verifying" });
+    toast({ title: "Verifying shipment...", description: shipment.id });
+
+    const verified = await runVerification(shipment);
+    if (!verified) {
+      setState(shipment.id, { phase: "flagged", error: "Verification failed" });
+      toast({ title: "Verification Failed", description: `${shipment.id} could not be verified.`, variant: "destructive" });
+      return;
+    }
+
+    // Verification passed — now open wallet (still within the same click handler call stack)
+    setState(shipment.id, { phase: "paying" });
+    toast({ title: "Verification passed", description: "Opening wallet for payment..." });
+
+    const result = await runPayment(shipment);
+    if (!result.txId) {
+      if (!result.userRejected) {
+        toast({ title: "Payment failed", description: result.error ?? "Unknown error", variant: "destructive" });
+      } else {
+        toast({ title: "Payment cancelled", description: "You can retry by clicking the button again." });
+      }
+      // Revert to verified so user can retry payment
+      setState(shipment.id, { phase: "verified" });
+      return;
+    }
+
+    setState(shipment.id, { phase: "cleared", txId: result.txId });
+    await notifyBackend(shipment.id, result.txId);
+    toast({ title: "Pre-Clearance Complete", description: `${shipment.id} cleared. TX: ${result.txId.slice(0, 24)}...` });
   };
 
-  const receiptForShipment = (id: string) => mockPortTrustReceipts.find(r => r.shipmentId === id);
+  // ── MANUAL MODE step A: verify only ──
+  const handleManualVerify = async (shipment: ShipmentTracking) => {
+    const s = getState(shipment.id);
+    if (s.phase === "verifying" || s.phase === "paying" || s.phase === "cleared") return;
 
-  const getTimeline = (id: string): ClearanceStepData => {
-    if (isMockMode) return MOCK_TIMELINES[id] ?? {};
-    const state = getShipmentState(id);
-    return {
-      order_received: true,
-      carrier_confirmed: carrierStatus === "connected",
-      agents_verified: state === "cleared",
-      payment_confirmed: state === "cleared",
-      pre_cleared: state === "cleared",
-      flagged: state === "flagged",
-    };
+    setState(shipment.id, { phase: "verifying" });
+    toast({ title: "Running verification...", description: shipment.id });
+
+    const verified = await runVerification(shipment);
+    if (!verified) {
+      setState(shipment.id, { phase: "flagged", error: "Verification failed" });
+      toast({ title: "Verification Failed", description: `${shipment.id} flagged.`, variant: "destructive" });
+      return;
+    }
+
+    setState(shipment.id, { phase: "verified" });
+    toast({ title: "Verified", description: `${shipment.id} verified. Click "Complete Payment" to pre-clear.` });
   };
 
+  // ── MANUAL MODE step B: explicit payment click ──
+  const handleManualPayment = async (shipment: ShipmentTracking) => {
+    const s = getState(shipment.id);
+    if (s.phase !== "verified") return;
+
+    setState(shipment.id, { phase: "paying" });
+
+    const result = await runPayment(shipment);
+    if (!result.txId) {
+      if (!result.userRejected) {
+        toast({ title: "Payment failed", description: result.error ?? "Unknown error", variant: "destructive" });
+      } else {
+        toast({ title: "Payment cancelled", description: "Click 'Complete Payment' to retry." });
+      }
+      setState(shipment.id, { phase: "verified" }); // allow retry
+      return;
+    }
+
+    setState(shipment.id, { phase: "cleared", txId: result.txId });
+    await notifyBackend(shipment.id, result.txId);
+    toast({ title: "Pre-Clearance Complete", description: `${shipment.id} cleared. TX: ${result.txId.slice(0, 24)}...` });
+  };
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6 max-w-5xl">
       {/* ── Page Header ── */}
@@ -192,16 +311,11 @@ const MerchantPortalPage = () => {
         <div className="relative">
           {merchant ? (
             <>
-              <button
-                onClick={() => setUserMenuOpen(o => !o)}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border bg-card hover:border-accent/40 transition-colors"
-              >
-                <img
-                  src={merchant.logoUrl}
-                  alt={merchant.name}
+              <button onClick={() => setUserMenuOpen(o => !o)}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border bg-card hover:border-accent/40 transition-colors">
+                <img src={merchant.logoUrl} alt={merchant.name}
                   className="h-7 w-7 rounded-full object-cover border border-border"
-                  onError={e => { (e.target as HTMLImageElement).src = "https://placehold.co/28x28/1e3a5f/ffffff?text=M"; }}
-                />
+                  onError={e => { (e.target as HTMLImageElement).src = "https://placehold.co/28x28/1e3a5f/ffffff?text=M"; }} />
                 <div className="text-left">
                   <div className="text-[10px] font-heading font-bold text-foreground leading-none">{merchant.name}</div>
                   <div className="text-[9px] text-muted-foreground mt-0.5">Merchant</div>
@@ -222,11 +336,8 @@ const MerchantPortalPage = () => {
               )}
             </>
           ) : (
-            <button
-              onClick={handleSignIn}
-              disabled={authLoading}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-accent bg-accent/10 text-accent text-xs font-heading font-bold uppercase tracking-wider hover:bg-accent/20 transition-colors disabled:opacity-50"
-            >
+            <button onClick={handleSignIn} disabled={authLoading}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-accent bg-accent/10 text-accent text-xs font-heading font-bold uppercase tracking-wider hover:bg-accent/20 transition-colors disabled:opacity-50">
               <LogIn className="h-3.5 w-3.5" />
               {authLoading ? "Signing in..." : "Sign In"}
             </button>
@@ -243,10 +354,8 @@ const MerchantPortalPage = () => {
             <span className={`h-2 w-2 rounded-full ${carrierStatus === "connected" ? "bg-success" : carrierStatus === "loading" ? "bg-warning animate-pulse" : "bg-destructive"}`} />
           </div>
           <div className="relative">
-            <button
-              onClick={() => setCarrierDropdownOpen(o => !o)}
-              className="flex items-center gap-2 w-full px-3 py-2 rounded-lg border border-[hsl(213_40%_28%)] bg-[hsl(213_40%_18%)] text-sm font-medium text-white hover:border-accent/40 transition-colors"
-            >
+            <button onClick={() => setCarrierDropdownOpen(o => !o)}
+              className="flex items-center gap-2 w-full px-3 py-2 rounded-lg border border-[hsl(213_40%_28%)] bg-[hsl(213_40%_18%)] text-sm font-medium text-white hover:border-accent/40 transition-colors">
               <Package className="h-4 w-4 text-accent" />
               {selectedCarrierLabel}
               <ChevronDown className={`h-3.5 w-3.5 ml-auto text-white/60 transition-transform ${carrierDropdownOpen ? "rotate-180" : ""}`} />
@@ -260,8 +369,7 @@ const MerchantPortalPage = () => {
                       !c.available ? "text-muted-foreground/40 cursor-not-allowed"
                         : selectedCarrier === c.id ? "bg-primary/10 text-primary font-medium"
                         : "text-foreground hover:bg-secondary"
-                    }`}
-                  >
+                    }`}>
                     {c.label}
                     {!c.available && <span className="text-[9px] border border-muted text-muted-foreground px-1.5 py-0.5 rounded uppercase tracking-wider">Soon</span>}
                     {c.available && selectedCarrier === c.id && <CheckCircle className="h-3.5 w-3.5 text-success" />}
@@ -280,26 +388,22 @@ const MerchantPortalPage = () => {
           </div>
         </div>
 
-        {/* Pre-Clearance Toggle Card */}
-        <div className="rounded-xl border border-[hsl(213_50%_22%)] bg-[hsl(213_40%_14%)] p-4 flex flex-col gap-2 min-w-[200px]">
+        {/* Pre-Clearance Mode Toggle */}
+        <div className="rounded-xl border border-[hsl(213_50%_22%)] bg-[hsl(213_40%_14%)] p-4 flex flex-col gap-2 min-w-[220px]">
           <span className="text-[10px] font-heading font-bold text-white/60 uppercase tracking-wider">Pre-Clearance Mode</span>
           <div className="flex items-center gap-3">
             <Shield className="h-5 w-5 text-accent" />
-            <button
-              onClick={() => setClearanceMode(m => m === "auto" ? "manual" : "auto")}
-              className="flex items-center gap-2 text-sm font-heading font-bold"
-            >
-              {clearanceMode === "auto" ? (
-                <><ToggleRight className="h-5 w-5 text-success" /><span className="text-success">Auto</span></>
-              ) : (
-                <><ToggleLeft className="h-5 w-5 text-warning" /><span className="text-warning">Manual</span></>
-              )}
+            <button onClick={() => setClearanceMode(m => m === "auto" ? "manual" : "auto")}
+              className="flex items-center gap-2 text-sm font-heading font-bold">
+              {clearanceMode === "auto"
+                ? <><ToggleRight className="h-5 w-5 text-success" /><span className="text-success">Auto Pre-Clearance</span></>
+                : <><ToggleLeft className="h-5 w-5 text-warning" /><span className="text-warning">Manual Pre-Clearance</span></>}
             </button>
           </div>
           <p className="text-[10px] text-white/60 leading-snug">
             {clearanceMode === "auto"
-              ? "Shipments auto-submit to backend when ready."
-              : "Each request requires your confirmation."}
+              ? "One click: verify + pay + pre-clear automatically."
+              : "Two steps: verify first, then confirm payment separately."}
           </p>
         </div>
       </div>
@@ -308,7 +412,7 @@ const MerchantPortalPage = () => {
       {clearanceMode === "manual" && (
         <div className="rounded border border-warning/30 bg-warning/5 px-4 py-2 text-xs text-warning font-medium flex items-center gap-2">
           <Zap className="h-3.5 w-3.5" />
-          Manual mode: each pre-clearance requires your confirmation before submitting.
+          Manual mode: verification runs first. A second "Complete Payment" button appears after verification passes.
         </div>
       )}
 
@@ -321,13 +425,16 @@ const MerchantPortalPage = () => {
           <div className="py-8 text-center text-muted-foreground text-sm">No live shipments yet.</div>
         )}
         {shipments.map(shipment => {
-          const state = getShipmentState(shipment.id);
+          const s = getState(shipment.id);
           const receipt = receiptForShipment(shipment.id);
-          const isCleared = state === "cleared";
-          const isPending = state === "pending";
-          const isFlagged = state === "flagged";
-          const awaitingConfirm = pendingConfirm === shipment.id;
-          const timeline = getTimeline(shipment.id);
+          const timeline = buildTimeline(shipment.id, s.phase, carrierStatus === "connected", isMockMode);
+
+          const isIdle      = s.phase === "idle";
+          const isVerifying = s.phase === "verifying";
+          const isVerified  = s.phase === "verified";
+          const isPaying    = s.phase === "paying";
+          const isCleared   = s.phase === "cleared";
+          const isFlagged   = s.phase === "flagged";
 
           return (
             <div key={shipment.id} className="rounded-xl border border-border bg-card p-5 shadow-card hover:shadow-elevated transition-all">
@@ -335,14 +442,21 @@ const MerchantPortalPage = () => {
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-mono text-sm font-bold text-foreground">{shipment.id}</span>
+
                     {isCleared && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-success/30 bg-success/10 text-success text-[10px] font-heading font-bold uppercase tracking-wider">
                         <CheckCircle className="h-2.5 w-2.5" /> Pre-Cleared
                       </span>
                     )}
-                    {isPending && (
+                    {(isVerifying || isPaying) && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-warning/30 bg-warning/10 text-warning text-[10px] font-heading font-bold uppercase tracking-wider">
-                        <Clock className="h-2.5 w-2.5" /> Processing...
+                        <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                        {isVerifying ? "Verifying..." : "Processing Payment..."}
+                      </span>
+                    )}
+                    {isVerified && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-primary/30 bg-primary/10 text-primary text-[10px] font-heading font-bold uppercase tracking-wider">
+                        <Clock className="h-2.5 w-2.5" /> Verified - Payment Pending
                       </span>
                     )}
                     {isFlagged && (
@@ -351,16 +465,29 @@ const MerchantPortalPage = () => {
                       </span>
                     )}
                   </div>
+
                   <div className="text-xs text-muted-foreground">
-                    {shipment.carrier} · {shipment.origin} → {shipment.destination} · ETA {shipment.eta}
+                    {shipment.carrier} · {shipment.origin} &rarr; {shipment.destination} · ETA {shipment.eta}
                   </div>
                   {shipment.containerCount && (
                     <div className="text-xs text-muted-foreground">
                       {shipment.containerCount} containers · {shipment.verifiedContainers} verified · {shipment.flaggedContainers} flagged
                     </div>
                   )}
+                  {isCleared && s.txId && (
+                    <div className="text-[10px] text-muted-foreground font-mono mt-0.5">
+                      TX: {s.txId.slice(0, 32)}...
+                      {!isMockMode && (
+                        <a href={`https://hashscan.io/testnet/transaction/${s.txId}`} target="_blank" rel="noopener noreferrer"
+                          className="ml-2 text-accent hover:underline inline-flex items-center gap-0.5">
+                          HashScan <ExternalLink className="h-2.5 w-2.5" />
+                        </a>
+                      )}
+                    </div>
+                  )}
                 </div>
 
+                {/* Action buttons */}
                 <div className="flex items-center gap-2 flex-wrap">
                   {isCleared && receipt && (
                     <button onClick={() => setReceiptModal(shipment.id)}
@@ -368,23 +495,51 @@ const MerchantPortalPage = () => {
                       View Receipt
                     </button>
                   )}
-                  {awaitingConfirm && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-warning font-medium">Confirm?</span>
-                      <button onClick={() => requestPreClearance(shipment)}
-                        className="px-3 py-1.5 rounded border border-success/40 bg-success/10 text-success text-xs font-medium hover:bg-success/20 transition-colors">
-                        Yes, Submit
-                      </button>
-                      <button onClick={() => setPendingConfirm(null)}
-                        className="px-3 py-1.5 rounded border border-border text-xs text-muted-foreground hover:bg-secondary transition-colors">
-                        Cancel
-                      </button>
-                    </div>
+
+                  {/* AUTO mode button */}
+                  {clearanceMode === "auto" && !isCleared && (
+                    <button
+                      disabled={isVerifying || isPaying}
+                      onClick={() => handleAutoPreClearance(shipment)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-accent bg-accent/10 text-accent text-xs font-heading font-bold uppercase tracking-wider hover:bg-accent/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {(isVerifying || isPaying) && <Loader2 className="h-3 w-3 animate-spin" />}
+                      {isVerifying ? "Verifying..." : isPaying ? "Processing..." : isFlagged ? "Retry" : "Request Pre-Clearance"}
+                    </button>
                   )}
-                  {!awaitingConfirm && (
-                    <button disabled={isCleared || isPending} onClick={() => requestPreClearance(shipment)}
-                      className="px-3 py-1.5 rounded border border-accent bg-accent/10 text-accent text-xs font-heading font-bold uppercase tracking-wider hover:bg-accent/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                      {isPending ? "Processing..." : isCleared ? "Pre-Cleared" : "Request Pre-Clearance"}
+
+                  {/* MANUAL mode: step A */}
+                  {clearanceMode === "manual" && (isIdle || isFlagged) && (
+                    <button
+                      onClick={() => handleManualVerify(shipment)}
+                      className="px-3 py-1.5 rounded border border-accent bg-accent/10 text-accent text-xs font-heading font-bold uppercase tracking-wider hover:bg-accent/20 transition-colors"
+                    >
+                      {isFlagged ? "Retry Verification" : "Request Pre-Clearance"}
+                    </button>
+                  )}
+
+                  {/* MANUAL mode: step A in-progress */}
+                  {clearanceMode === "manual" && isVerifying && (
+                    <button disabled className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-border text-muted-foreground text-xs font-heading font-bold uppercase tracking-wider opacity-50 cursor-not-allowed">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Verifying...
+                    </button>
+                  )}
+
+                  {/* MANUAL mode: step B — explicit payment */}
+                  {clearanceMode === "manual" && isVerified && (
+                    <button
+                      onClick={() => handleManualPayment(shipment)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-success/50 bg-success/10 text-success text-xs font-heading font-bold uppercase tracking-wider hover:bg-success/20 transition-colors"
+                    >
+                      <CreditCard className="h-3 w-3" />
+                      Complete Payment &amp; Pre-Clear
+                    </button>
+                  )}
+
+                  {/* MANUAL mode: payment in-progress */}
+                  {clearanceMode === "manual" && isPaying && (
+                    <button disabled className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-border text-muted-foreground text-xs font-heading font-bold uppercase tracking-wider opacity-50 cursor-not-allowed">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Processing Payment...
                     </button>
                   )}
                 </div>
@@ -404,8 +559,10 @@ const MerchantPortalPage = () => {
           <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setReceiptModal(null)}>
             <div className="bg-card border border-border rounded-xl max-w-lg w-full max-h-[85vh] overflow-y-auto shadow-elevated" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between p-4 border-b border-border">
-                <h3 className="font-heading font-bold text-foreground text-sm">Port Trust Receipt – {receipt.shipmentId}</h3>
-                <button onClick={() => setReceiptModal(null)} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+                <h3 className="font-heading font-bold text-foreground text-sm">Port Trust Receipt - {receipt.shipmentId}</h3>
+                <button onClick={() => setReceiptModal(null)} className="text-muted-foreground hover:text-foreground">
+                  <X className="h-4 w-4" />
+                </button>
               </div>
               <div className="p-4">
                 <PortTrustReceipt receipt={receipt} verificationType="merchant" />
