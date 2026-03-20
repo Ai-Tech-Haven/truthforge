@@ -22,13 +22,13 @@ export default defineConfig({
     commonjsOptions: {
       transformMixedEsModules: true,
     },
-    rollupOptions: {
-      // Safety net: if Rollup ever sees these specifiers, treat as external
-      // rather than failing the build. The runtime dynamic import handles them.
-      external: (id) =>
-        id.includes("hedera-wallet-connect") ||
-        id.includes("@hiero-ledger") ||
-        id.includes("@hashgraph"),
-    },
+    // No externals — @hashgraph packages are bundled normally
+  },
+  optimizeDeps: {
+    // Pre-bundle these so Vite doesn't choke on their ESM-only dist
+    include: [
+      "@hashgraph/hedera-wallet-connect",
+      "@hiero-ledger/sdk",
+    ],
   },
 });

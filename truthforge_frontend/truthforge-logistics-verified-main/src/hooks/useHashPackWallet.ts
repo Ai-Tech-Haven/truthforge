@@ -1,64 +1,42 @@
-// useHashPackWallet — Vercel-safe HashPack wallet hook
-// RULES:
-//   - Zero top-level @hashgraph / @hiero-ledger imports
-//   - All SDK code inside connectWallet() only
-//   - No auto-connect on mount
-//   - localStorage for persistence (display-only after refresh)
+// useHashPackWallet — HashPack wallet hook
+// Uses singleton DAppConnector from @/lib/hashpack
+// No auto-connect. Connect only on explicit user click.
 
-import { useState, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { getConnector, resetConnector } from "@/lib/hashpack";
 
-const STORAGE_KEY_ACCOUNT = "tf_wallet_account";
-const STORAGE_KEY_NETWORK = "tf_wallet_network";
-
-// Runtime-assembled specifiers — Rollup cannot statically analyse these
-const _hwc = () => ["@hashgraph", "hedera-wallet-connect"].join("/");
-const _sdk = () => ["@hiero-ledger", "sdk"].join("/");
-const WC_PROJECT_ID = "b0d4a8b7c3e2f1a9d6e5c4b3a2f1e0d9";
+const STORAGE_KEY = "tf_wallet_account";
 
 export interface WalletState {
   accountId: string | null;
   balance: string | null;
-  network: "testnet" | "mainnet";
+  network: "testnet";
   isConnected: boolean;
   isConnecting: boolean;
   error: string | null;
 }
 
-// Read persisted account from localStorage (client-only, display-only)
-function readPersistedAccount(): { accountId: string | null; network: "testnet" | "mainnet" } {
-  if (typeof window === "undefined") return { accountId: null, network: "testnet" };
-  try {
-    const accountId = localStorage.getItem(STORAGE_KEY_ACCOUNT);
-    const network = (localStorage.getItem(STORAGE_KEY_NETWORK) ?? "testnet") as "testnet" | "mainnet";
-    return { accountId, network };
-  } catch {
-    return { accountId: null, network: "testnet" };
-  }
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _connector: any = null;
-let _initialized = false;
-
 export function useHashPackWallet() {
-  const persisted = readPersistedAccount();
-
-  const [state, setState] = useState<WalletState>({
-    accountId: persisted.accountId,
-    balance: null,
-    network: persisted.network,
-    isConnected: !!persisted.accountId,
-    isConnecting: false,
-    error: null,
+  const [state, setState] = useState<WalletState>(() => {
+    // Restore persisted account on mount (display-only, no popup)
+    if (typeof window === "undefined") {
+      return { accountId: null, balance: null, network: "testnet", isConnected: false, isConnecting: false, error: null };
+    }
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return {
+      accountId: saved ?? null,
+      balance: null,
+      network: "testnet",
+      isConnected: !!saved,
+      isConnecting: false,
+      error: null,
+    };
   });
 
-  // Fetch HBAR balance from Hedera mirror node (no SDK needed)
-  const fetchBalance = useCallback(async (accountId: string, network: "testnet" | "mainnet") => {
+  // Fetch balance from mirror node — no SDK needed
+  const fetchBalance = useCallback(async (accountId: string): Promise<string | null> => {
     try {
-      const base = network === "mainnet"
-        ? "https://mainnet-public.mirrornode.hedera.com"
-        : "https://testnet.mirrornode.hedera.com";
-      const res = await fetch(`${base}/api/v1/accounts/${accountId}`);
+      const res = await fetch(`https://testnet.mirrornode.hedera.com/api/v1/accounts/${accountId}`);
       if (!res.ok) return null;
       const data = await res.json() as { balance?: { balance?: number } };
       const tinybars = data?.balance?.balance ?? 0;
@@ -68,44 +46,31 @@ export function useHashPackWallet() {
     }
   }, []);
 
+  // Fetch balance on mount if we have a persisted account
+  useEffect(() => {
+    if (state.accountId && !state.balance) {
+      fetchBalance(state.accountId).then(balance => {
+        if (balance) setState(s => ({ ...s, balance }));
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // connectWallet — MUST be called from explicit user click only
   const connectWallet = useCallback(async (): Promise<string | null> => {
     if (typeof window === "undefined") return null;
+    if (state.isConnecting) return null;
 
     setState(s => ({ ...s, isConnecting: true, error: null }));
 
     try {
-      if (!_connector || !_initialized) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const dynImport = Function("s", "return import(s)") as (s: string) => Promise<any>;
-        const [hwc, sdk] = await Promise.all([dynImport(_hwc()), dynImport(_sdk())]);
-        const { DAppConnector, HederaJsonRpcMethod, HederaSessionEvent, HederaChainId } = hwc;
-        const { LedgerId } = sdk;
+      const connector = await getConnector();
 
-        const meta = {
-          name: "TruthForge",
-          description: "Logistics verification platform on Hedera",
-          icons: [`${window.location.origin}/favicon.ico`],
-          url: window.location.origin,
-        };
+      // Open HashPack modal — user must approve
+      await connector.openModal();
 
-        const connector = new DAppConnector(
-          meta,
-          LedgerId.TESTNET,
-          WC_PROJECT_ID,
-          Object.values(HederaJsonRpcMethod),
-          [HederaSessionEvent.ChainChanged, HederaSessionEvent.AccountsChanged],
-          [HederaChainId.Testnet],
-        );
-        await connector.init({ logger: "error" });
-        _connector = connector;
-        _initialized = true;
-      }
-
-      // Open HashPack popup — user must approve
-      await _connector.openModal();
-
-      const sessions = _connector.walletConnectClient?.session.getAll() ?? [];
+      // Read account from active sessions
+      const sessions = connector.walletConnectClient?.session.getAll() ?? [];
       const latest = sessions[sessions.length - 1];
       const accountId =
         latest?.namespaces?.hedera?.accounts?.[0]?.split(":")?.[2] ??
@@ -113,16 +78,12 @@ export function useHashPackWallet() {
         null;
 
       if (!accountId) {
-        setState(s => ({ ...s, isConnecting: false, error: "No account found. Approve in HashPack." }));
+        setState(s => ({ ...s, isConnecting: false, error: "No account found — approve in HashPack." }));
         return null;
       }
 
-      // Persist to localStorage (display-only on next load)
-      localStorage.setItem(STORAGE_KEY_ACCOUNT, accountId);
-      localStorage.setItem(STORAGE_KEY_NETWORK, "testnet");
-
-      // Fetch balance
-      const balance = await fetchBalance(accountId, "testnet");
+      localStorage.setItem(STORAGE_KEY, accountId);
+      const balance = await fetchBalance(accountId);
 
       setState({
         accountId,
@@ -136,52 +97,25 @@ export function useHashPackWallet() {
       return accountId;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      const userRejected =
-        msg.toLowerCase().includes("modal closed") ||
-        msg.toLowerCase().includes("user rejected");
-      setState(s => ({
-        ...s,
-        isConnecting: false,
-        error: userRejected ? null : msg,
-      }));
+      const dismissed = msg.toLowerCase().includes("modal closed") || msg.toLowerCase().includes("user rejected");
+      setState(s => ({ ...s, isConnecting: false, error: dismissed ? null : msg }));
       return null;
     }
-  }, [fetchBalance]);
+  }, [state.isConnecting, fetchBalance]);
 
-  // disconnectWallet — clears localStorage and resets state, no SDK call needed
+  // disconnectWallet — clears storage and resets state, no popup
   const disconnectWallet = useCallback(() => {
-    try {
-      if (_connector) {
-        _connector.disconnectAll?.();
-        _connector = null;
-        _initialized = false;
-      }
-    } catch { /* ignore */ }
-    try {
-      localStorage.removeItem(STORAGE_KEY_ACCOUNT);
-      localStorage.removeItem(STORAGE_KEY_NETWORK);
-    } catch { /* ignore */ }
-    setState({
-      accountId: null,
-      balance: null,
-      network: "testnet",
-      isConnected: false,
-      isConnecting: false,
-      error: null,
-    });
+    resetConnector();
+    try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+    setState({ accountId: null, balance: null, network: "testnet", isConnected: false, isConnecting: false, error: null });
   }, []);
 
-  // Refresh balance on demand (no popup, no SDK)
+  // Refresh balance on demand
   const refreshBalance = useCallback(async () => {
     if (!state.accountId) return;
-    const balance = await fetchBalance(state.accountId, state.network);
-    setState(s => ({ ...s, balance }));
-  }, [state.accountId, state.network, fetchBalance]);
+    const balance = await fetchBalance(state.accountId);
+    if (balance) setState(s => ({ ...s, balance }));
+  }, [state.accountId, fetchBalance]);
 
-  return {
-    ...state,
-    connectWallet,
-    disconnectWallet,
-    refreshBalance,
-  };
+  return { ...state, connectWallet, disconnectWallet, refreshBalance };
 }

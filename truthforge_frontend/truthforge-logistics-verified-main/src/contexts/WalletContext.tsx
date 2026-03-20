@@ -1,6 +1,5 @@
 // WalletContext — thin wrapper around useHashPackWallet
-// Provides wallet state to the entire app via React context.
-// ZERO top-level @hashgraph imports — Vercel-safe.
+// Provides wallet state app-wide. No top-level SDK imports.
 
 import React, { createContext, useContext } from "react";
 import { useHashPackWallet, WalletState } from "@/hooks/useHashPackWallet";
@@ -9,7 +8,7 @@ interface WalletContextType extends WalletState {
   connectWallet: () => Promise<string | null>;
   disconnectWallet: () => void;
   refreshBalance: () => Promise<void>;
-  // Legacy compat alias
+  // Legacy compat shape used by LiveModeBanner / MerchantPortalPage
   wallet: { accountId: string; network: string } | null;
 }
 
@@ -29,15 +28,13 @@ const WalletContext = createContext<WalletContextType>({
 export const useWallet = () => useContext(WalletContext);
 
 export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const walletHook = useHashPackWallet();
-
-  // Legacy compat: expose wallet.accountId shape used by LiveModeBanner / MerchantPortalPage
-  const wallet = walletHook.isConnected && walletHook.accountId
-    ? { accountId: walletHook.accountId, network: walletHook.network }
+  const hook = useHashPackWallet();
+  const wallet = hook.isConnected && hook.accountId
+    ? { accountId: hook.accountId, network: hook.network }
     : null;
 
   return (
-    <WalletContext.Provider value={{ ...walletHook, wallet }}>
+    <WalletContext.Provider value={{ ...hook, wallet }}>
       {children}
     </WalletContext.Provider>
   );

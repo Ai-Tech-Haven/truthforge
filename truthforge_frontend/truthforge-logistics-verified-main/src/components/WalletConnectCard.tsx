@@ -1,13 +1,12 @@
 // WalletConnectCard — Header wallet UI
-// Shows Connect button or connected card with balance + disconnect dropdown.
-// No top-level @hashgraph imports.
+// Real connectWallet() on click. No alerts. No auto-connect.
 
 import { useState } from "react";
 import { useWallet } from "@/contexts/WalletContext";
 import { Wallet, LogOut, RefreshCw, ExternalLink, ChevronDown } from "lucide-react";
 
 const WalletConnectCard = () => {
-  const { accountId, balance, isConnected, isConnecting, connectWallet, disconnectWallet, refreshBalance } = useWallet();
+  const { accountId, balance, isConnected, isConnecting, error, connectWallet, disconnectWallet, refreshBalance } = useWallet();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -31,9 +30,7 @@ const WalletConnectCard = () => {
             {accountId}
           </span>
           {balance && (
-            <span className="text-[10px] text-success/70 hidden md:block">
-              {balance}
-            </span>
+            <span className="text-[10px] text-success/70 hidden md:block">{balance}</span>
           )}
           <ChevronDown className={`h-3 w-3 text-success/60 transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
         </button>
@@ -43,7 +40,6 @@ const WalletConnectCard = () => {
             className="absolute right-0 top-full mt-1 w-52 rounded-lg border border-border bg-card shadow-lg z-[9999] py-1"
             onMouseLeave={() => setDropdownOpen(false)}
           >
-            {/* Account info */}
             <div className="px-3 py-2 border-b border-border">
               <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Connected Wallet</div>
               <a
@@ -56,12 +52,9 @@ const WalletConnectCard = () => {
                 {accountId}
                 <ExternalLink className="h-2.5 w-2.5 shrink-0" />
               </a>
-              {balance && (
-                <div className="text-xs text-success mt-0.5 font-medium">{balance}</div>
-              )}
+              {balance && <div className="text-xs text-success mt-0.5 font-medium">{balance}</div>}
             </div>
 
-            {/* Refresh balance */}
             <button
               onClick={handleRefresh}
               disabled={refreshing}
@@ -71,7 +64,6 @@ const WalletConnectCard = () => {
               {refreshing ? "Refreshing..." : "Refresh Balance"}
             </button>
 
-            {/* HashScan link */}
             <a
               href={`https://hashscan.io/testnet/account/${accountId}`}
               target="_blank"
@@ -83,7 +75,6 @@ const WalletConnectCard = () => {
               View on HashScan
             </a>
 
-            {/* Disconnect */}
             <button
               onClick={() => { disconnectWallet(); setDropdownOpen(false); }}
               className="w-full flex items-center gap-2 px-3 py-2 text-xs text-destructive hover:bg-destructive/10 transition-colors border-t border-border mt-1"
@@ -98,21 +89,22 @@ const WalletConnectCard = () => {
   }
 
   return (
-    <button
-      onClick={() => {
-        console.log("WALLET BUTTON CLICKED");
-        alert("Wallet button clicked");
-      }}
-      disabled={isConnecting}
-      className="flex items-center gap-1.5 px-3 h-8 rounded-lg border border-accent/50 bg-accent/10 text-accent text-xs font-heading font-bold uppercase tracking-wider hover:bg-accent/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-      style={{ position: "relative", zIndex: 9999, pointerEvents: "auto" }}
-    >
-      {isConnecting ? (
-        <><RefreshCw className="h-3 w-3 animate-spin" /><span className="hidden sm:inline">Connecting...</span></>
-      ) : (
-        <><Wallet className="h-3 w-3" /><span className="hidden sm:inline">Connect Wallet</span></>
+    <div className="flex flex-col items-end gap-0.5">
+      <button
+        onClick={connectWallet}
+        disabled={isConnecting}
+        className="flex items-center gap-1.5 px-3 h-8 rounded-lg border border-accent/50 bg-accent/10 text-accent text-xs font-heading font-bold uppercase tracking-wider hover:bg-accent/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {isConnecting ? (
+          <><RefreshCw className="h-3 w-3 animate-spin" /><span className="hidden sm:inline">Connecting...</span></>
+        ) : (
+          <><Wallet className="h-3 w-3" /><span className="hidden sm:inline">Connect Wallet</span></>
+        )}
+      </button>
+      {error && (
+        <span className="text-[9px] text-destructive max-w-[140px] truncate">{error}</span>
       )}
-    </button>
+    </div>
   );
 };
 
