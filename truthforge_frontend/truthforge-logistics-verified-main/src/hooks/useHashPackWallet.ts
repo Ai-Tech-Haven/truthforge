@@ -1,9 +1,9 @@
 // useHashPackWallet — HashPack wallet hook
-// Uses singleton DAppConnector from @/lib/hashpack
-// No auto-connect. Connect only on explicit user click.
+// Zero SDK imports. Uses browser extension API via @/lib/hashpack.
+// Connect ONLY on explicit user click. No auto-connect.
 
 import { useState, useEffect, useCallback } from "react";
-import { getConnector, resetConnector } from "@/lib/hashpack";
+import { connectHashPack, disconnectHashPack } from "@/lib/hashpack";
 
 const STORAGE_KEY = "tf_wallet_account";
 
@@ -18,7 +18,6 @@ export interface WalletState {
 
 export function useHashPackWallet() {
   const [state, setState] = useState<WalletState>(() => {
-    // Restore persisted account on mount (display-only, no popup)
     if (typeof window === "undefined") {
       return { accountId: null, balance: null, network: "testnet", isConnected: false, isConnecting: false, error: null };
     }
@@ -33,10 +32,13 @@ export function useHashPackWallet() {
     };
   });
 
-  // Fetch balance from mirror node — no SDK needed
+  // Fetch balance from Hedera Mirror Node REST API — no SDK needed
   const fetchBalance = useCallback(async (accountId: string): Promise<string | null> => {
     try {
-      const res = await fetch(`https://testnet.mirrornode.hedera.com/api/v1/accounts/${accountId}`);
+      const res = await fetch(
+        `https://testnet.mirrornode.hedera.com/api/v1/accounts/${accountId}`,
+        { signal: AbortSignal.timeout(8000) }
+      );
       if (!res.ok) return null;
       const data = await res.json() as { balance?: { balance?: number } };
       const tinybars = data?.balance?.balance ?? 0;
@@ -46,7 +48,7 @@ export function useHashPackWallet() {
     }
   }, []);
 
-  // Fetch balance on mount if we have a persisted account
+  // Restore balance on mount for persisted account (no popup)
   useEffect(() => {
     if (state.accountId && !state.balance) {
       fetchBalance(state.accountId).then(balance => {
@@ -64,23 +66,8 @@ export function useHashPackWallet() {
     setState(s => ({ ...s, isConnecting: true, error: null }));
 
     try {
-      const connector = await getConnector();
-
-      // Open HashPack modal — user must approve
-      await connector.openModal();
-
-      // Read account from active sessions
-      const sessions = connector.walletConnectClient?.session.getAll() ?? [];
-      const latest = sessions[sessions.length - 1];
-      const accountId =
-        latest?.namespaces?.hedera?.accounts?.[0]?.split(":")?.[2] ??
-        latest?.namespaces?.["hedera:testnet"]?.accounts?.[0]?.split(":")?.[2] ??
-        null;
-
-      if (!accountId) {
-        setState(s => ({ ...s, isConnecting: false, error: "No account found — approve in HashPack." }));
-        return null;
-      }
+      const session = await connectHashPack();
+      const { accountId } = session;
 
       localStorage.setItem(STORAGE_KEY, accountId);
       const balance = await fetchBalance(accountId);
@@ -97,15 +84,18 @@ export function useHashPackWallet() {
       return accountId;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      const dismissed = msg.toLowerCase().includes("modal closed") || msg.toLowerCase().includes("user rejected");
+      const dismissed =
+        msg.toLowerCase().includes("rejected") ||
+        msg.toLowerCase().includes("cancelled") ||
+        msg.toLowerCase().includes("closed");
       setState(s => ({ ...s, isConnecting: false, error: dismissed ? null : msg }));
       return null;
     }
   }, [state.isConnecting, fetchBalance]);
 
-  // disconnectWallet — clears storage and resets state, no popup
+  // disconnectWallet — clears storage and resets state
   const disconnectWallet = useCallback(() => {
-    resetConnector();
+    disconnectHashPack();
     try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
     setState({ accountId: null, balance: null, network: "testnet", isConnected: false, isConnecting: false, error: null });
   }, []);

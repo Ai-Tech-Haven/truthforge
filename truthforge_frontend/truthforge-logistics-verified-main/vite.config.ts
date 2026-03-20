@@ -22,13 +22,5 @@ export default defineConfig({
     commonjsOptions: {
       transformMixedEsModules: true,
     },
-    // No externals — @hashgraph packages are bundled normally
-  },
-  optimizeDeps: {
-    // Pre-bundle these so Vite doesn't choke on their ESM-only dist
-    include: [
-      "@hashgraph/hedera-wallet-connect",
-      "@hiero-ledger/sdk",
-    ],
   },
 });

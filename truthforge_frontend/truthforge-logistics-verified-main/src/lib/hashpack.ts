@@ -1,47 +1,69 @@
-// hashpack.ts — Singleton DAppConnector for HashPack wallet
-// Client-only. Never imported at SSR/build time from top-level.
-// All wallet SDK code lives here — nowhere else.
+// hashpack.ts — Browser-only HashPack wallet connector
+// Zero SDK imports. Uses HashPack browser extension API (window.hashpack)
+// or falls back to WalletConnect pairing URL display.
+// Frontend responsibility: identity only (accountId + balance display).
+// All Hedera transactions are delegated to the Railway backend.
 
-import {
-  DAppConnector,
-  HederaJsonRpcMethod,
-  HederaSessionEvent,
-  HederaChainId,
-} from "@hashgraph/hedera-wallet-connect";
-import { LedgerId } from "@hiero-ledger/sdk";
-
-const WC_PROJECT_ID = "b0d4a8b7c3e2f1a9d6e5c4b3a2f1e0d9";
-
-let _connector: DAppConnector | null = null;
-let _initialized = false;
-
-export async function getConnector(): Promise<DAppConnector> {
-  if (_connector && _initialized) return _connector;
-
-  const meta = {
-    name: "TruthForge",
-    description: "Verifiable Trade & Logistics Proof",
-    icons: [typeof window !== "undefined" ? `${window.location.origin}/favicon.ico` : ""],
-    url: typeof window !== "undefined" ? window.location.origin : "",
-  };
-
-  const connector = new DAppConnector(
-    meta,
-    LedgerId.TESTNET,
-    WC_PROJECT_ID,
-    Object.values(HederaJsonRpcMethod),
-    [HederaSessionEvent.ChainChanged, HederaSessionEvent.AccountsChanged],
-    [HederaChainId.Testnet],
-  );
-
-  await connector.init({ logger: "error" });
-  _connector = connector;
-  _initialized = true;
-  return connector;
+export interface HashPackSession {
+  accountId: string;
+  network: "testnet" | "mainnet";
 }
 
-export function resetConnector() {
-  try { _connector?.disconnectAll?.(); } catch { /* ignore */ }
-  _connector = null;
-  _initialized = false;
+// HashPack extension injects window.hashpack in the browser
+declare global {
+  interface Window {
+    hashpack?: {
+      sendRequest: (msg: object) => Promise<{ success: boolean; accountIds?: string[]; error?: string }>;
+    };
+  }
+}
+
+const APP_META = {
+  name: "TruthForge",
+  description: "Verifiable Trade & Logistics Proof",
+  icon: typeof window !== "undefined" ? `${window.location.origin}/favicon.ico` : "",
+  url: typeof window !== "undefined" ? window.location.origin : "",
+};
+
+/**
+ * Connect to HashPack browser extension.
+ * Must be called from an explicit user click handler.
+ * Returns the connected accountId or throws.
+ */
+export async function connectHashPack(): Promise<HashPackSession> {
+  if (typeof window === "undefined") {
+    throw new Error("HashPack is only available in the browser.");
+  }
+
+  if (!window.hashpack) {
+    // Extension not installed — open install page
+    window.open("https://www.hashpack.app/download", "_blank");
+    throw new Error("HashPack extension not found. Please install it and try again.");
+  }
+
+  const response = await window.hashpack.sendRequest({
+    type: "connect",
+    network: "testnet",
+    dappMetadata: APP_META,
+  });
+
+  if (!response.success || !response.accountIds?.length) {
+    throw new Error(response.error ?? "Connection rejected in HashPack.");
+  }
+
+  return {
+    accountId: response.accountIds[0],
+    network: "testnet",
+  };
+}
+
+/**
+ * Disconnect from HashPack extension.
+ * Fire-and-forget — clears local state regardless of extension response.
+ */
+export async function disconnectHashPack(): Promise<void> {
+  if (typeof window === "undefined" || !window.hashpack) return;
+  try {
+    await window.hashpack.sendRequest({ type: "disconnect" });
+  } catch { /* ignore — local state is cleared by caller */ }
 }

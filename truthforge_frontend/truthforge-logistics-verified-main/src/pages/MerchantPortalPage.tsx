@@ -76,7 +76,7 @@ function buildTimeline(
 // ─── Component ────────────────────────────────────────────────────────────────
 const MerchantPortalPage = () => {
   const { isMockMode } = useMockMode();
-  const { wallet, connectWallet } = useWallet();
+  const { wallet } = useWallet();
   const { toast } = useToast();
 
   const [merchant, setMerchant] = useState<MerchantUser | null>(null);
@@ -188,21 +188,14 @@ const MerchantPortalPage = () => {
     } catch { return false; }
   }
 
-  // ── Step 2: Payment (explicit user click only) ──
+  // ── Step 2: Payment — delegates to Railway backend ──
   async function runPayment(shipment: ShipmentTracking): Promise<{ txId?: string; error?: string; userRejected?: boolean }> {
     if (isMockMode) {
       await new Promise(r => setTimeout(r, 1200));
       return { txId: `MOCK-TX-${shipment.id}-${Date.now()}` };
     }
-    // In live mode, wallet must be connected first
-    if (!wallet?.accountId) {
-      toast({ title: "Wallet required", description: "Connect your HashPack wallet to make HBAR payments.", variant: "destructive" });
-      connectWallet();
-      return { userRejected: true };
-    }
-    // Dynamic import — only runs on explicit user click, never at module load
     const { submitHederaPayment } = await import("@/lib/hedera-payment");
-    return submitHederaPayment(shipment.id, VERIFICATION_FEE_HBAR);
+    return submitHederaPayment(shipment.id, VERIFICATION_FEE_HBAR, wallet?.accountId ?? null);
   }
 
   // ── Step 3: Notify backend of txId ──
