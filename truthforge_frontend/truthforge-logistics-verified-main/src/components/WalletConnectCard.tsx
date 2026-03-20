@@ -1,37 +1,98 @@
+// WalletConnectCard — Header wallet UI
+// Shows Connect button or connected card with balance + disconnect dropdown.
+// No top-level @hashgraph imports.
+
+import { useState } from "react";
 import { useWallet } from "@/contexts/WalletContext";
-import { Wallet, LogOut, RefreshCw, ExternalLink } from "lucide-react";
+import { Wallet, LogOut, RefreshCw, ExternalLink, ChevronDown } from "lucide-react";
 
-/**
- * WalletConnectCard — shown in the Header for Merchant & Carrier portals.
- * Connects to HashPack on testnet. Vercel-safe: no static hashgraph imports.
- */
 const WalletConnectCard = () => {
-  const { wallet, isConnecting, connectWallet, disconnectWallet } = useWallet();
+  const { accountId, balance, isConnected, isConnecting, connectWallet, disconnectWallet, refreshBalance } = useWallet();
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  if (wallet?.accountId) {
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await refreshBalance();
+    setRefreshing(false);
+  };
+
+  if (isConnected && accountId) {
     return (
-      <div className="flex items-center gap-1.5 rounded-lg border border-success/40 bg-success/10 px-2.5 h-8">
-        <span className="h-1.5 w-1.5 rounded-full bg-success shrink-0" />
-        <a
-          href={`https://hashscan.io/testnet/account/${wallet.accountId}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="font-mono text-[10px] text-success hover:underline flex items-center gap-0.5 hidden sm:flex"
-          title={wallet.accountId}
-        >
-          {wallet.accountId}
-          <ExternalLink className="h-2.5 w-2.5 shrink-0" />
-        </a>
-        <span className="font-mono text-[10px] text-success sm:hidden">
-          {wallet.accountId.slice(0, 8)}…
-        </span>
+      <div className="relative">
         <button
-          onClick={disconnectWallet}
-          title="Disconnect wallet"
-          className="ml-1 text-success/60 hover:text-success transition-colors"
+          onClick={() => setDropdownOpen(o => !o)}
+          className="flex items-center gap-1.5 rounded-lg border border-success/40 bg-success/10 px-2.5 h-8 hover:bg-success/15 transition-colors"
+          aria-haspopup="true"
+          aria-expanded={dropdownOpen}
         >
-          <LogOut className="h-3 w-3" />
+          <span className="h-1.5 w-1.5 rounded-full bg-success shrink-0" />
+          <span className="font-mono text-[10px] text-success hidden sm:block truncate max-w-[90px]">
+            {accountId}
+          </span>
+          {balance && (
+            <span className="text-[10px] text-success/70 hidden md:block">
+              {balance}
+            </span>
+          )}
+          <ChevronDown className={`h-3 w-3 text-success/60 transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
         </button>
+
+        {dropdownOpen && (
+          <div
+            className="absolute right-0 top-full mt-1 w-52 rounded-lg border border-border bg-card shadow-lg z-[9999] py-1"
+            onMouseLeave={() => setDropdownOpen(false)}
+          >
+            {/* Account info */}
+            <div className="px-3 py-2 border-b border-border">
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Connected Wallet</div>
+              <a
+                href={`https://hashscan.io/testnet/account/${accountId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-mono text-xs text-accent hover:underline flex items-center gap-1"
+                onClick={() => setDropdownOpen(false)}
+              >
+                {accountId}
+                <ExternalLink className="h-2.5 w-2.5 shrink-0" />
+              </a>
+              {balance && (
+                <div className="text-xs text-success mt-0.5 font-medium">{balance}</div>
+              )}
+            </div>
+
+            {/* Refresh balance */}
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-secondary transition-colors"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 text-muted-foreground ${refreshing ? "animate-spin" : ""}`} />
+              {refreshing ? "Refreshing..." : "Refresh Balance"}
+            </button>
+
+            {/* HashScan link */}
+            <a
+              href={`https://hashscan.io/testnet/account/${accountId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-secondary transition-colors"
+              onClick={() => setDropdownOpen(false)}
+            >
+              <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+              View on HashScan
+            </a>
+
+            {/* Disconnect */}
+            <button
+              onClick={() => { disconnectWallet(); setDropdownOpen(false); }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-destructive hover:bg-destructive/10 transition-colors border-t border-border mt-1"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              Disconnect
+            </button>
+          </div>
+        )}
       </div>
     );
   }
