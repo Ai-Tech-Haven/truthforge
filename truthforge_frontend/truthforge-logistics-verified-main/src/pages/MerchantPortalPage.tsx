@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useMockMode } from "@/contexts/MockModeContext";
+import { useWallet } from "@/contexts/WalletContext";
 import { mockShipments, mockPortTrustReceipts, ShipmentTracking } from "@/lib/mock-data";
+import LiveModeBanner from "@/components/LiveModeBanner";
 import {
   Package, ChevronDown, CheckCircle, Clock, AlertTriangle,
   Shield, Zap, ToggleLeft, ToggleRight, LogOut, LogIn,
@@ -74,6 +76,7 @@ function buildTimeline(
 // ─── Component ────────────────────────────────────────────────────────────────
 const MerchantPortalPage = () => {
   const { isMockMode } = useMockMode();
+  const { wallet, connectWallet } = useWallet();
   const { toast } = useToast();
 
   const [merchant, setMerchant] = useState<MerchantUser | null>(null);
@@ -190,6 +193,12 @@ const MerchantPortalPage = () => {
     if (isMockMode) {
       await new Promise(r => setTimeout(r, 1200));
       return { txId: `MOCK-TX-${shipment.id}-${Date.now()}` };
+    }
+    // In live mode, wallet must be connected first
+    if (!wallet?.accountId) {
+      toast({ title: "Wallet required", description: "Connect your HashPack wallet to make HBAR payments.", variant: "destructive" });
+      connectWallet();
+      return { userRejected: true };
     }
     // Dynamic import — only runs on explicit user click, never at module load
     const { submitHederaPayment } = await import("@/lib/hedera-payment");
@@ -346,6 +355,7 @@ const MerchantPortalPage = () => {
       </div>
 
       {/* ── Controls Row ── */}
+      <LiveModeBanner />
       <div className="flex flex-wrap items-stretch gap-3">
         {/* Carrier Card */}
         <div className="rounded-xl border border-[hsl(213_50%_22%)] bg-[hsl(213_40%_14%)] p-4 flex flex-col gap-2 min-w-[200px]">

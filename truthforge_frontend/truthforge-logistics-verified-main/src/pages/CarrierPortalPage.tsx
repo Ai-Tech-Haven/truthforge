@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useMockMode } from "@/contexts/MockModeContext";
 import { mockShipments, mockPortTrustReceipts, ShipmentTracking } from "@/lib/mock-data";
 import { apiFetch } from "@/lib/api-client";
+import LiveModeBanner from "@/components/LiveModeBanner";
 import {
   Ship, Plane, Truck, CheckCircle, AlertTriangle, Clock,
   Package, ExternalLink, ChevronDown, LogIn, LogOut,
@@ -229,6 +230,8 @@ const CarrierPortalPage = () => {
           </div>
         </div>
       </div>
+
+      <LiveModeBanner />
 
       <div className="rounded-xl border border-[hsl(213_50%_28%)] bg-[hsl(213_45%_16%)] shadow-card overflow-hidden">
         <div className="px-5 py-3 border-b border-[hsl(213_50%_24%)]">
