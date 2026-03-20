@@ -246,7 +246,7 @@ const Header = () => {
         h-14 is fixed — no padding/height changes on hover.
       */}
       <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0a1628]/95 backdrop-blur overflow-visible">
-        <div className="container flex h-14 items-center justify-between gap-2 overflow-visible">
+        <div className="container flex h-14 items-center justify-between gap-3 overflow-visible">
 
           {/* Logo — transition-opacity only, no layout shift */}
           <button
@@ -262,7 +262,7 @@ const Header = () => {
 
           {/* Nav — overflow-visible so dropdowns escape the header */}
           <nav
-            className="flex items-center gap-0.5 overflow-visible"
+            className="flex items-center gap-0.5 overflow-visible flex-1 justify-center"
             role="navigation"
             aria-label="Main navigation"
           >
@@ -279,26 +279,29 @@ const Header = () => {
             </button>
           </nav>
 
-          {/* Right Controls */}
+          {/* Right Controls — responsive, fills remaining space */}
           <div className="flex items-center gap-1.5 shrink-0 overflow-visible z-40">
 
+            {/* Theme toggle */}
             <button
               onClick={toggleTheme}
               aria-label="Toggle theme"
-              className="p-1.5 rounded transition-colors duration-150 text-slate-400 hover:text-white hover:bg-white/10"
+              className="p-1.5 rounded transition-colors duration-150 text-slate-400 hover:text-white hover:bg-white/10 shrink-0"
             >
               {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
             </button>
 
+            {/* Wallet */}
             <WalletConnectCard />
 
-            <div className={`flex items-center gap-1.5 px-2 h-7 rounded border text-[10px] font-bold tracking-wide uppercase shrink-0 ${
+            {/* Mock / Live toggle */}
+            <div className={`flex items-center gap-1 px-2 h-7 rounded border text-[10px] font-bold tracking-wide uppercase shrink-0 ${
               isMockMode
                 ? "border-warning/40 bg-warning/10 text-warning"
                 : "border-success/40 bg-success/10 text-success"
             }`}>
               <Database className="h-3 w-3 shrink-0" />
-              <span className="hidden sm:inline">{isMockMode ? "Mock" : "Live"}</span>
+              <span className="hidden xs:inline sm:inline">{isMockMode ? "Mock" : "Live"}</span>
               <Switch
                 checked={!isMockMode}
                 onCheckedChange={toggleMockMode}
