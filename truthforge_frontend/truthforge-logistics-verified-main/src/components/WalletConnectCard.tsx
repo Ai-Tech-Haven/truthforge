@@ -99,9 +99,13 @@ const WalletConnectCard = () => {
 
   return (
     <button
-      onClick={connectWallet}
+      onClick={() => {
+        console.log("WALLET BUTTON CLICKED");
+        alert("Wallet button clicked");
+      }}
       disabled={isConnecting}
       className="flex items-center gap-1.5 px-3 h-8 rounded-lg border border-accent/50 bg-accent/10 text-accent text-xs font-heading font-bold uppercase tracking-wider hover:bg-accent/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      style={{ position: "relative", zIndex: 9999, pointerEvents: "auto" }}
     >
       {isConnecting ? (
         <><RefreshCw className="h-3 w-3 animate-spin" /><span className="hidden sm:inline">Connecting...</span></>
