@@ -262,7 +262,7 @@ const Header = () => {
 
           {/* Nav — overflow-visible so dropdowns escape the header */}
           <nav
-            className="flex items-center gap-0.5 overflow-visible flex-1 justify-center"
+            className="flex items-center gap-0.5 overflow-visible flex-1"
             role="navigation"
             aria-label="Main navigation"
           >
@@ -272,21 +272,21 @@ const Header = () => {
             <DropdownMenu label="Integrations" icon={Plug} items={integrationItems} />
             <button
               onClick={() => setHelpOpen(true)}
-              className="flex items-center gap-1.5 px-3 h-9 text-xs font-semibold uppercase tracking-wide rounded whitespace-nowrap transition-colors duration-150 text-slate-300 hover:text-white hover:bg-white/10"
+              className="flex items-center gap-1 px-2 h-9 text-xs font-semibold uppercase tracking-wide rounded whitespace-nowrap transition-colors duration-150 text-slate-300 hover:text-white hover:bg-white/10"
             >
-              <HelpCircle className="h-4 w-4 shrink-0" />
+              <HelpCircle className="h-3.5 w-3.5 shrink-0" />
               <span className="hidden lg:inline">Help</span>
             </button>
           </nav>
 
-          {/* Right Controls — responsive, fills remaining space */}
-          <div className="flex items-center gap-1.5 shrink-0 overflow-visible z-40">
+          {/* Right Controls — tight, all visible at 100% zoom desktop */}
+          <div className="flex items-center gap-1 shrink-0 overflow-visible z-40 border-l border-white/10 pl-2">
 
             {/* Theme toggle */}
             <button
               onClick={toggleTheme}
               aria-label="Toggle theme"
-              className="p-1.5 rounded transition-colors duration-150 text-slate-400 hover:text-white hover:bg-white/10 shrink-0"
+              className="p-1 rounded transition-colors duration-150 text-slate-400 hover:text-white hover:bg-white/10 shrink-0"
             >
               {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
             </button>
@@ -295,13 +295,13 @@ const Header = () => {
             <WalletConnectCard />
 
             {/* Mock / Live toggle */}
-            <div className={`flex items-center gap-1 px-2 h-7 rounded border text-[10px] font-bold tracking-wide uppercase shrink-0 ${
+            <div className={`flex items-center gap-0.5 px-1.5 h-7 rounded border text-[10px] font-bold tracking-wide uppercase shrink-0 ${
               isMockMode
                 ? "border-warning/40 bg-warning/10 text-warning"
                 : "border-success/40 bg-success/10 text-success"
             }`}>
               <Database className="h-3 w-3 shrink-0" />
-              <span className="hidden xs:inline sm:inline">{isMockMode ? "Mock" : "Live"}</span>
+              <span className="hidden sm:inline">{isMockMode ? "Mock" : "Live"}</span>
               <Switch
                 checked={!isMockMode}
                 onCheckedChange={toggleMockMode}
