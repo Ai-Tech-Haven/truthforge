@@ -277,7 +277,6 @@ const CarrierPortalPage = () => {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap justify-end">
-          {/* Mode toggle */}
           <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1">
             <button
               onClick={() => setVerificationMode("auto")}
@@ -297,7 +296,6 @@ const CarrierPortalPage = () => {
             </button>
           </div>
 
-          {/* Carrier auth */}
           <div className="relative">
             {carrier ? (
               <>
@@ -346,7 +344,6 @@ const CarrierPortalPage = () => {
 
       <LiveModeBanner />
 
-      {/* Upload & Verify panel */}
       <div className="rounded-xl border border-[hsl(213_50%_28%)] bg-[hsl(213_45%_16%)] shadow-card overflow-hidden">
         <div className="px-5 py-3 border-b border-[hsl(213_50%_24%)]">
           <h3 className="text-sm font-heading font-bold text-white flex items-center gap-2">
@@ -358,7 +355,7 @@ const CarrierPortalPage = () => {
         <div className="p-5 space-y-4">
           <CarrierVerificationPanel onVerified={handleVerified} />
           {uploadPhase !== "idle" && (
-            <CarrierClearanceTimeline data={uploadClearanceData()} mode={verificationMode} />
+            <CarrierClearanceTimeline data={uploadClearanceData()} />
           )}
           {uploadPhase === "verified" && verificationMode === "manual" && (
             <button
@@ -386,7 +383,6 @@ const CarrierPortalPage = () => {
         </div>
       </div>
 
-      {/* Verification result intelligence panel */}
       {verificationResult && (
         <div className="rounded-xl border border-border bg-card shadow-card p-5 space-y-4">
           <div className="flex items-center justify-between">
@@ -472,7 +468,6 @@ const CarrierPortalPage = () => {
         </div>
       )}
 
-      {/* Merchant Shipments list */}
       <div className="rounded-xl border border-border bg-card shadow-card overflow-hidden">
         <div className="p-5 border-b border-border flex items-center justify-between gap-3 flex-wrap">
           <div>
@@ -567,7 +562,6 @@ const CarrierPortalPage = () => {
         </div>
       </div>
 
-      {/* Receipt modal */}
       {receiptModal && (() => {
         const receipt = receiptForShipment(receiptModal);
         if (!receipt) return null;
