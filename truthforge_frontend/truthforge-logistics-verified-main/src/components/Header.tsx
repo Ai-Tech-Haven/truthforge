@@ -71,7 +71,7 @@ const DropdownMenu = ({ label, icon: Icon, items }: DropdownMenuProps) => {
       {/* Trigger button — fixed height, no layout-shifting transitions */}
       <button
         onClick={() => setOpen(o => !o)}
-        className={`flex items-center gap-1.5 px-3 h-9 text-sm font-semibold uppercase tracking-wide rounded whitespace-nowrap transition-colors duration-150 ${
+        className={`flex items-center gap-1.5 px-3 h-9 text-xs font-semibold uppercase tracking-wide rounded whitespace-nowrap transition-colors duration-150 ${
           isActive
             ? "bg-accent/20 text-white"
             : "text-slate-300 hover:text-white hover:bg-white/10"
@@ -272,7 +272,7 @@ const Header = () => {
             <DropdownMenu label="Integrations" icon={Plug} items={integrationItems} />
             <button
               onClick={() => setHelpOpen(true)}
-              className="flex items-center gap-1.5 px-3 h-9 text-sm font-semibold uppercase tracking-wide rounded whitespace-nowrap transition-colors duration-150 text-slate-300 hover:text-white hover:bg-white/10"
+              className="flex items-center gap-1.5 px-3 h-9 text-xs font-semibold uppercase tracking-wide rounded whitespace-nowrap transition-colors duration-150 text-slate-300 hover:text-white hover:bg-white/10"
             >
               <HelpCircle className="h-4 w-4 shrink-0" />
               <span className="hidden lg:inline">Help</span>
@@ -280,30 +280,30 @@ const Header = () => {
           </nav>
 
           {/* Right Controls */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0 overflow-visible z-40">
 
             <button
               onClick={toggleTheme}
               aria-label="Toggle theme"
               className="p-1.5 rounded transition-colors duration-150 text-slate-400 hover:text-white hover:bg-white/10"
             >
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
             </button>
 
             <WalletConnectCard />
 
-            <div className={`flex items-center gap-2 px-3 h-8 rounded border text-xs font-bold tracking-wide uppercase ${
+            <div className={`flex items-center gap-1.5 px-2 h-7 rounded border text-[10px] font-bold tracking-wide uppercase shrink-0 ${
               isMockMode
                 ? "border-warning/40 bg-warning/10 text-warning"
                 : "border-success/40 bg-success/10 text-success"
             }`}>
-              <Database className="h-3 w-3" />
+              <Database className="h-3 w-3 shrink-0" />
               <span className="hidden sm:inline">{isMockMode ? "Mock" : "Live"}</span>
               <Switch
                 checked={!isMockMode}
                 onCheckedChange={toggleMockMode}
                 aria-label="Toggle data mode"
-                className="scale-[0.65]"
+                className="scale-[0.6] shrink-0"
               />
             </div>
           </div>

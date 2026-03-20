@@ -19,6 +19,7 @@ const WalletContext = createContext<WalletContextType>({
   isConnected: false,
   isConnecting: false,
   error: null,
+  notInstalled: false,
   connectWallet: async () => null,
   disconnectWallet: () => {},
   refreshBalance: async () => {},

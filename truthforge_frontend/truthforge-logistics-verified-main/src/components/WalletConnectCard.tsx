@@ -1,12 +1,25 @@
 // WalletConnectCard — Header wallet UI
-// Real connectWallet() on click. No alerts. No auto-connect.
+// Opens HashPack extension popup on click only.
+// If extension not installed: shows inline message + download link.
+// No auto-connect. No redirects. No SDK.
 
 import { useState } from "react";
 import { useWallet } from "@/contexts/WalletContext";
-import { Wallet, LogOut, RefreshCw, ExternalLink, ChevronDown } from "lucide-react";
+import { Wallet, LogOut, RefreshCw, ExternalLink, ChevronDown, Download } from "lucide-react";
+
+// Shorten address: 0.0.1234567 → 0.0.123…567
+function shortAddr(id: string): string {
+  if (id.length <= 12) return id;
+  return id.slice(0, 7) + "…" + id.slice(-3);
+}
 
 const WalletConnectCard = () => {
-  const { accountId, balance, isConnected, isConnecting, error, connectWallet, disconnectWallet, refreshBalance } = useWallet();
+  const {
+    accountId, balance, isConnected, isConnecting,
+    error, notInstalled,
+    connectWallet, disconnectWallet, refreshBalance,
+  } = useWallet();
+
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -16,51 +29,52 @@ const WalletConnectCard = () => {
     setRefreshing(false);
   };
 
+  // ── Connected state ──────────────────────────────────────────────────────
   if (isConnected && accountId) {
     return (
-      <div className="relative">
+      <div className="relative z-50">
         <button
           onClick={() => setDropdownOpen(o => !o)}
-          className="flex items-center gap-1.5 rounded-lg border border-success/40 bg-success/10 px-2.5 h-8 hover:bg-success/15 transition-colors"
+          className="flex items-center gap-1 rounded border border-success/40 bg-success/10 px-2 h-7 hover:bg-success/15 transition-colors"
           aria-haspopup="true"
           aria-expanded={dropdownOpen}
         >
           <span className="h-1.5 w-1.5 rounded-full bg-success shrink-0" />
-          <span className="font-mono text-[10px] text-success hidden sm:block truncate max-w-[90px]">
-            {accountId}
+          <span className="font-mono text-[9px] text-success hidden sm:block">
+            {shortAddr(accountId)}
           </span>
           {balance && (
-            <span className="text-[10px] text-success/70 hidden md:block">{balance}</span>
+            <span className="text-[9px] text-success/70 hidden lg:block ml-0.5">{balance}</span>
           )}
-          <ChevronDown className={`h-3 w-3 text-success/60 transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
+          <ChevronDown className={`h-2.5 w-2.5 text-success/60 transition-transform ml-0.5 ${dropdownOpen ? "rotate-180" : ""}`} />
         </button>
 
         {dropdownOpen && (
           <div
-            className="absolute right-0 top-full mt-1 w-52 rounded-lg border border-border bg-card shadow-lg z-[9999] py-1"
+            className="absolute right-0 top-full mt-1 w-48 rounded-lg border border-border bg-card shadow-lg z-50 py-1"
             onMouseLeave={() => setDropdownOpen(false)}
           >
             <div className="px-3 py-2 border-b border-border">
-              <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Connected Wallet</div>
+              <div className="text-[9px] text-muted-foreground uppercase tracking-wider mb-1">Connected</div>
               <a
                 href={`https://hashscan.io/testnet/account/${accountId}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-mono text-xs text-accent hover:underline flex items-center gap-1"
+                className="font-mono text-[10px] text-accent hover:underline flex items-center gap-1"
                 onClick={() => setDropdownOpen(false)}
               >
                 {accountId}
                 <ExternalLink className="h-2.5 w-2.5 shrink-0" />
               </a>
-              {balance && <div className="text-xs text-success mt-0.5 font-medium">{balance}</div>}
+              {balance && <div className="text-[10px] text-success mt-0.5 font-medium">{balance}</div>}
             </div>
 
             <button
               onClick={handleRefresh}
               disabled={refreshing}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-secondary transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 text-[10px] text-foreground hover:bg-secondary transition-colors"
             >
-              <RefreshCw className={`h-3.5 w-3.5 text-muted-foreground ${refreshing ? "animate-spin" : ""}`} />
+              <RefreshCw className={`h-3 w-3 text-muted-foreground ${refreshing ? "animate-spin" : ""}`} />
               {refreshing ? "Refreshing..." : "Refresh Balance"}
             </button>
 
@@ -68,18 +82,18 @@ const WalletConnectCard = () => {
               href={`https://hashscan.io/testnet/account/${accountId}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-secondary transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 text-[10px] text-foreground hover:bg-secondary transition-colors"
               onClick={() => setDropdownOpen(false)}
             >
-              <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+              <ExternalLink className="h-3 w-3 text-muted-foreground" />
               View on HashScan
             </a>
 
             <button
               onClick={() => { disconnectWallet(); setDropdownOpen(false); }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-destructive hover:bg-destructive/10 transition-colors border-t border-border mt-1"
+              className="w-full flex items-center gap-2 px-3 py-2 text-[10px] text-destructive hover:bg-destructive/10 transition-colors border-t border-border mt-1"
             >
-              <LogOut className="h-3.5 w-3.5" />
+              <LogOut className="h-3 w-3" />
               Disconnect
             </button>
           </div>
@@ -88,21 +102,39 @@ const WalletConnectCard = () => {
     );
   }
 
+  // ── Not connected state ──────────────────────────────────────────────────
   return (
     <div className="flex flex-col items-end gap-0.5">
       <button
         onClick={connectWallet}
         disabled={isConnecting}
-        className="flex items-center gap-1.5 px-3 h-8 rounded-lg border border-accent/50 bg-accent/10 text-accent text-xs font-heading font-bold uppercase tracking-wider hover:bg-accent/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex items-center gap-1 px-2 h-7 rounded border border-accent/50 bg-accent/10 text-accent text-[10px] font-bold uppercase tracking-wider hover:bg-accent/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {isConnecting ? (
-          <><RefreshCw className="h-3 w-3 animate-spin" /><span className="hidden sm:inline">Connecting...</span></>
+          <><RefreshCw className="h-2.5 w-2.5 animate-spin" /><span className="hidden sm:inline">Connecting…</span></>
         ) : (
-          <><Wallet className="h-3 w-3" /><span className="hidden sm:inline">Connect Wallet</span></>
+          <><Wallet className="h-2.5 w-2.5" /><span className="hidden sm:inline">Connect</span></>
         )}
       </button>
-      {error && (
-        <span className="text-[9px] text-destructive max-w-[140px] truncate">{error}</span>
+
+      {/* Extension not installed — inline message + download link, no forced redirect */}
+      {notInstalled && (
+        <div className="flex items-center gap-1 text-[9px] text-warning">
+          <span>HashPack not detected.</span>
+          <a
+            href="https://www.hashpack.app/download"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-0.5 text-accent hover:underline"
+          >
+            <Download className="h-2 w-2" /> Install
+          </a>
+        </div>
+      )}
+
+      {/* Other errors */}
+      {error && !notInstalled && (
+        <span className="text-[9px] text-destructive max-w-[130px] truncate">{error}</span>
       )}
     </div>
   );
