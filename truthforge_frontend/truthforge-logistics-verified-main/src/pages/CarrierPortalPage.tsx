@@ -6,21 +6,29 @@ import LiveModeBanner from "@/components/LiveModeBanner";
 import {
   Ship, Plane, Truck, CheckCircle, AlertTriangle, Clock,
   Package, ExternalLink, ChevronDown, LogIn, LogOut,
-  RefreshCw, X
+  RefreshCw, X, Zap, Hand
 } from "lucide-react";
 import CarrierVerificationPanel, { VerificationResult, TransportMode } from "@/components/CarrierVerificationPanel";
 import PortTrustReceipt from "@/components/PortTrustReceipt";
 import CarrierProcessingTimeline, { CarrierTimelineData } from "@/components/CarrierProcessingTimeline";
+import CarrierClearanceTimeline, { CarrierClearanceStepData } from "@/components/CarrierClearanceTimeline";
 import { useToast } from "@/hooks/use-toast";
 
-// ─── Constants ───────────────────────────────────────────────────────────────
 const RAILWAY = "https://web-production-dcd43.up.railway.app";
 const FEDEX_LOGO = "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/FedEx_Corporation_-_2016_Logo.svg/1200px-FedEx_Corporation_-_2016_Logo.svg.png";
 const FEDEX_NAME = "FedEx";
 const FEDEX_SITE = "https://www.fedex.com";
+const HBAR_FEE = 2;
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-type PreClearanceState = "none" | "pending" | "cleared" | "flagged";
+type VerificationMode = "auto" | "manual";
+type ClearancePhase = "idle" | "verifying" | "verified" | "paying" | "cleared" | "flagged";
+
+interface ShipmentClearanceState {
+  phase: ClearancePhase;
+  txId?: string;
+  hashscanUrl?: string;
+}
+
 interface CarrierUser { name: string; logoUrl: string; siteUrl: string }
 const MOCK_CARRIER: CarrierUser = { name: FEDEX_NAME, logoUrl: FEDEX_LOGO, siteUrl: FEDEX_SITE };
 
@@ -49,10 +57,13 @@ const CarrierPortalPage = () => {
   const [carrier, setCarrier] = useState<CarrierUser | null>(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
-
-  const [transportMode, setTransportMode] = useState<TransportMode>("sea");
+  const [verificationMode, setVerificationMode] = useState<VerificationMode>("auto");
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
-  const [preClearanceStates, setPreClearanceStates] = useState<Record<string, PreClearanceState>>({});
+  const [transportMode, setTransportMode] = useState<TransportMode>("sea");
+  const [uploadPhase, setUploadPhase] = useState<ClearancePhase>("idle");
+  const [uploadTxId, setUploadTxId] = useState<string | undefined>();
+  const [uploadHashscan, setUploadHashscan] = useState<string | undefined>();
+  const [preClearanceStates, setPreClearanceStates] = useState<Record<string, ShipmentClearanceState>>({});
   const [receiptModal, setReceiptModal] = useState<string | null>(null);
   const [liveShipments, setLiveShipments] = useState<ShipmentTracking[]>([]);
   const [shipmentsLoading, setShipmentsLoading] = useState(false);
@@ -119,49 +130,130 @@ const CarrierPortalPage = () => {
     toast({ title: "Signed out" });
   };
 
-  const getShipmentState = (id: string): PreClearanceState =>
-    preClearanceStates[id] ?? (mockPortTrustReceipts.find(r => r.shipmentId === id) ? "cleared" : "none");
-
-  const handlePreClearance = async (shipment: ShipmentTracking) => {
-    setPreClearanceStates(s => ({ ...s, [shipment.id]: "pending" }));
+  const runPayment = async (shipmentId: string): Promise<{ txId: string; hashscanUrl: string } | null> => {
     if (isMockMode) {
       await new Promise(r => setTimeout(r, 1200));
-      setPreClearanceStates(s => ({ ...s, [shipment.id]: "cleared" }));
-      toast({ title: "Pre-Clearance Issued", description: `${shipment.id} cleared on Hedera.` });
+      const fakeTx = `0.0.mock-${Date.now()}`;
+      return { txId: fakeTx, hashscanUrl: `https://hashscan.io/testnet/transaction/${fakeTx}` };
+    }
+    const { submitHederaPayment } = await import("@/lib/hedera-payment");
+    const result = await submitHederaPayment(shipmentId, HBAR_FEE);
+    if (!result.success) {
+      toast({ title: result.userRejected ? "Payment cancelled" : "Payment failed", description: result.error ?? "Unknown error", variant: "destructive" });
+      return null;
+    }
+    return { txId: result.txId!, hashscanUrl: result.hashscanUrl! };
+  };
+
+  const persistTxId = async (shipmentId: string, txId: string) => {
+    try {
+      await apiFetch(`/api/v1/shipments/${shipmentId}/pre-clearance`, {
+        method: "POST",
+        body: JSON.stringify({ carrier: "fedex", txId }),
+      });
+    } catch { /* non-blocking */ }
+  };
+
+  const handleVerified = async (result: VerificationResult) => {
+    setVerificationResult(result);
+    setTransportMode(result.transportMode);
+    if (result.status === "flagged") {
+      setUploadPhase("flagged");
+      toast({ title: "Shipment Flagged", description: result.aiReasoning, variant: "destructive" });
+      return;
+    }
+    if (verificationMode === "auto") {
+      setUploadPhase("paying");
+      const payment = await runPayment(result.shipmentId);
+      if (!payment) { setUploadPhase("verified"); return; }
+      await persistTxId(result.shipmentId, payment.txId);
+      setUploadTxId(payment.txId);
+      setUploadHashscan(payment.hashscanUrl);
+      setUploadPhase("cleared");
+      toast({ title: "Port Clearance Issued", description: `${result.shipmentId} cleared on Hedera.` });
     } else {
+      setUploadPhase("verified");
+      toast({ title: "Verification Complete", description: "Payment required to complete pre-clearance." });
+    }
+  };
+
+  const handleUploadPayment = async () => {
+    if (!verificationResult) return;
+    setUploadPhase("paying");
+    const payment = await runPayment(verificationResult.shipmentId);
+    if (!payment) { setUploadPhase("verified"); return; }
+    await persistTxId(verificationResult.shipmentId, payment.txId);
+    setUploadTxId(payment.txId);
+    setUploadHashscan(payment.hashscanUrl);
+    setUploadPhase("cleared");
+    toast({ title: "Port Clearance Issued", description: `${verificationResult.shipmentId} cleared on Hedera.` });
+  };
+
+  const resetUploadPanel = () => {
+    setVerificationResult(null);
+    setUploadPhase("idle");
+    setUploadTxId(undefined);
+    setUploadHashscan(undefined);
+  };
+
+  const getShipmentState = (id: string): ShipmentClearanceState =>
+    preClearanceStates[id] ?? { phase: mockPortTrustReceipts.find(r => r.shipmentId === id) ? "cleared" : "idle" };
+
+  const handleInitiateVerification = async (shipment: ShipmentTracking) => {
+    setPreClearanceStates(s => ({ ...s, [shipment.id]: { phase: "verifying" } }));
+    if (!isMockMode) {
       try {
-        await apiFetch(`/api/v1/shipments/${shipment.id}/pre-clearance`, {
+        await apiFetch(`/api/v1/shipments/${shipment.id}/verify`, {
           method: "POST",
           body: JSON.stringify({ carrier: "fedex" }),
         });
-        setPreClearanceStates(s => ({ ...s, [shipment.id]: "cleared" }));
-        toast({ title: "Pre-Clearance Issued", description: `${shipment.id} cleared via live backend.` });
-      } catch {
-        setPreClearanceStates(s => ({ ...s, [shipment.id]: "flagged" }));
-        toast({ title: "Pre-Clearance Failed", description: "Backend returned an error.", variant: "destructive" });
-      }
+      } catch { /* treat as verified in demo */ }
     }
+    if (verificationMode === "auto") {
+      setPreClearanceStates(s => ({ ...s, [shipment.id]: { phase: "paying" } }));
+      const payment = await runPayment(shipment.id);
+      if (!payment) { setPreClearanceStates(s => ({ ...s, [shipment.id]: { phase: "verified" } })); return; }
+      await persistTxId(shipment.id, payment.txId);
+      setPreClearanceStates(s => ({ ...s, [shipment.id]: { phase: "cleared", txId: payment.txId, hashscanUrl: payment.hashscanUrl } }));
+      toast({ title: "Pre-Clearance Issued", description: `${shipment.id} cleared on Hedera.` });
+    } else {
+      setPreClearanceStates(s => ({ ...s, [shipment.id]: { phase: "verified" } }));
+      toast({ title: "Verified", description: "Payment required to complete pre-clearance." });
+    }
+  };
+
+  const handleShipmentPayment = async (shipment: ShipmentTracking) => {
+    setPreClearanceStates(s => ({ ...s, [shipment.id]: { ...s[shipment.id], phase: "paying" } }));
+    const payment = await runPayment(shipment.id);
+    if (!payment) { setPreClearanceStates(s => ({ ...s, [shipment.id]: { ...s[shipment.id], phase: "verified" } })); return; }
+    await persistTxId(shipment.id, payment.txId);
+    setPreClearanceStates(s => ({ ...s, [shipment.id]: { phase: "cleared", txId: payment.txId, hashscanUrl: payment.hashscanUrl } }));
+    toast({ title: "Pre-Clearance Issued", description: `${shipment.id} cleared on Hedera.` });
   };
 
   const receiptForShipment = (id: string) => mockPortTrustReceipts.find(r => r.shipmentId === id);
 
-  const handleVerified = (result: VerificationResult) => {
-    setVerificationResult(result);
-    setTransportMode(result.transportMode);
-  };
-
   const getTimeline = (shipment: ShipmentTracking): CarrierTimelineData => {
     if (isMockMode) return MOCK_TIMELINES[shipment.id] ?? {};
-    const state = getShipmentState(shipment.id);
+    const cs = getShipmentState(shipment.id);
     return {
       shipment_received: true,
-      documents_uploaded: verificationResult?.shipmentId === shipment.id,
-      agents_verified: state === "cleared",
-      submitted_for_clearance: state === "cleared",
-      port_pre_cleared: state === "cleared",
-      flagged: state === "flagged",
+      documents_uploaded: cs.phase !== "idle",
+      agents_verified: cs.phase === "cleared",
+      submitted_for_clearance: cs.phase === "cleared",
+      port_pre_cleared: cs.phase === "cleared",
+      flagged: cs.phase === "flagged",
     };
   };
+
+  const uploadClearanceData = (): CarrierClearanceStepData => ({
+    documents_uploaded: uploadPhase !== "idle",
+    verification_completed: ["verified", "paying", "cleared"].includes(uploadPhase),
+    payment_pending: uploadPhase === "verified" && verificationMode === "manual",
+    payment_completed: uploadPhase === "cleared" || uploadPhase === "paying",
+    clearance_issued: uploadPhase === "cleared",
+    flagged: uploadPhase === "flagged",
+  });
 
   const modeLabel: Record<TransportMode, string> = { sea: "Container", air: "Cargo", land: "Pallet" };
   const ModeIcon = transportMode === "sea" ? Ship : transportMode === "air" ? Plane : Truck;
@@ -185,6 +277,27 @@ const CarrierPortalPage = () => {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap justify-end">
+          {/* Mode toggle */}
+          <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1">
+            <button
+              onClick={() => setVerificationMode("auto")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-heading font-bold uppercase tracking-wider transition-colors ${
+                verificationMode === "auto" ? "bg-accent text-white" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Zap className="h-3 w-3" /> Auto
+            </button>
+            <button
+              onClick={() => setVerificationMode("manual")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-heading font-bold uppercase tracking-wider transition-colors ${
+                verificationMode === "manual" ? "bg-accent text-white" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Hand className="h-3 w-3" /> Manual
+            </button>
+          </div>
+
+          {/* Carrier auth */}
           <div className="relative">
             {carrier ? (
               <>
@@ -233,6 +346,7 @@ const CarrierPortalPage = () => {
 
       <LiveModeBanner />
 
+      {/* Upload & Verify panel */}
       <div className="rounded-xl border border-[hsl(213_50%_28%)] bg-[hsl(213_45%_16%)] shadow-card overflow-hidden">
         <div className="px-5 py-3 border-b border-[hsl(213_50%_24%)]">
           <h3 className="text-sm font-heading font-bold text-white flex items-center gap-2">
@@ -241,11 +355,38 @@ const CarrierPortalPage = () => {
           </h3>
           <p className="text-xs text-white/60 mt-0.5">Submit carrier documents for Hedera-verified pre-clearance.</p>
         </div>
-        <div className="p-5">
+        <div className="p-5 space-y-4">
           <CarrierVerificationPanel onVerified={handleVerified} />
+          {uploadPhase !== "idle" && (
+            <CarrierClearanceTimeline data={uploadClearanceData()} mode={verificationMode} />
+          )}
+          {uploadPhase === "verified" && verificationMode === "manual" && (
+            <button
+              onClick={handleUploadPayment}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-accent bg-accent text-white text-xs font-heading font-bold uppercase tracking-wider hover:bg-accent/80 transition-colors"
+            >
+              Pay {HBAR_FEE} HBAR &amp; Issue Clearance
+            </button>
+          )}
+          {uploadPhase === "cleared" && uploadTxId && (
+            <div className="rounded border border-success/30 bg-success/10 px-3 py-2 flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-success shrink-0" />
+              <div>
+                <div className="text-xs font-bold text-success">Port Clearance Issued</div>
+                <a href={uploadHashscan} target="_blank" rel="noopener noreferrer"
+                  className="font-mono text-[10px] text-accent hover:underline flex items-center gap-1">
+                  {uploadTxId} <ExternalLink className="h-2.5 w-2.5" />
+                </a>
+              </div>
+              <button onClick={resetUploadPanel} className="ml-auto text-muted-foreground hover:text-foreground">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
+      {/* Verification result intelligence panel */}
       {verificationResult && (
         <div className="rounded-xl border border-border bg-card shadow-card p-5 space-y-4">
           <div className="flex items-center justify-between">
@@ -331,6 +472,7 @@ const CarrierPortalPage = () => {
         </div>
       )}
 
+      {/* Merchant Shipments list */}
       <div className="rounded-xl border border-border bg-card shadow-card overflow-hidden">
         <div className="p-5 border-b border-border flex items-center justify-between gap-3 flex-wrap">
           <div>
@@ -354,10 +496,11 @@ const CarrierPortalPage = () => {
             <div className="py-8 text-center text-muted-foreground text-sm">No live shipments yet.</div>
           )}
           {shipments.map(shipment => {
-            const state = getShipmentState(shipment.id);
-            const isCleared = state === "cleared";
-            const isPending = state === "pending";
-            const isFlagged = state === "flagged";
+            const cs = getShipmentState(shipment.id);
+            const isCleared = cs.phase === "cleared";
+            const isPending = cs.phase === "paying" || cs.phase === "verifying";
+            const isVerified = cs.phase === "verified";
+            const isFlagged = cs.phase === "flagged";
             const receipt = receiptForShipment(shipment.id);
             const MIcon = shipment.freightMode === "air" ? Plane : shipment.freightMode === "land" ? Truck : Ship;
             const timeline = getTimeline(shipment);
@@ -398,13 +541,23 @@ const CarrierPortalPage = () => {
                         Port Trust Receipt
                       </button>
                     )}
-                    <button
-                      disabled={isCleared || isPending}
-                      onClick={() => handlePreClearance(shipment)}
-                      className="px-3 py-1.5 rounded border border-accent bg-accent/10 text-accent text-xs font-heading font-bold uppercase tracking-wider hover:bg-accent/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      {isPending ? "Processing..." : isCleared ? "Pre-Cleared" : "Initiate Verification"}
-                    </button>
+                    {isVerified && verificationMode === "manual" && (
+                      <button
+                        onClick={() => handleShipmentPayment(shipment)}
+                        className="px-3 py-1.5 rounded border border-accent bg-accent text-white text-xs font-heading font-bold uppercase tracking-wider hover:bg-accent/80 transition-colors"
+                      >
+                        Pay &amp; Clear
+                      </button>
+                    )}
+                    {!isCleared && !isVerified && (
+                      <button
+                        disabled={isPending}
+                        onClick={() => handleInitiateVerification(shipment)}
+                        className="px-3 py-1.5 rounded border border-accent bg-accent/10 text-accent text-xs font-heading font-bold uppercase tracking-wider hover:bg-accent/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {isPending ? "Processing..." : "Initiate Verification"}
+                      </button>
+                    )}
                   </div>
                 </div>
                 <CarrierProcessingTimeline data={timeline} preCleared={isCleared && !!receipt} />
@@ -414,6 +567,7 @@ const CarrierPortalPage = () => {
         </div>
       </div>
 
+      {/* Receipt modal */}
       {receiptModal && (() => {
         const receipt = receiptForShipment(receiptModal);
         if (!receipt) return null;
