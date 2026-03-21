@@ -179,7 +179,11 @@ const Header = () => {
   const { isMockMode, toggleMockMode } = useMockMode();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const [helpOpen, setHelpOpen] = useState(false);
+
+  // Wallet button only on Merchant and Carrier portals
+  const showWallet = location.pathname === "/merchant" || location.pathname === "/carrier";
 
   // Live integration badge state
   const [wcConnected, setWcConnected] = useState(true);
@@ -291,8 +295,8 @@ const Header = () => {
               {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
             </button>
 
-            {/* Wallet */}
-            <WalletConnectCard />
+            {/* Wallet — only on /merchant and /carrier */}
+            {showWallet && <WalletConnectCard />}
 
             {/* Mock / Live toggle */}
             <div className={`flex items-center gap-0.5 px-1.5 h-7 rounded border text-[10px] font-bold tracking-wide uppercase shrink-0 ${
