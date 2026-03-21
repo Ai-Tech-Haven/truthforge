@@ -3,7 +3,6 @@ import { useMockMode } from "@/contexts/MockModeContext";
 import { useWallet } from "@/contexts/WalletContext";
 import { mockShipments, mockPortTrustReceipts, ShipmentTracking } from "@/lib/mock-data";
 import LiveModeBanner from "@/components/LiveModeBanner";
-import WalletConnectCard from "@/components/WalletConnectCard";
 import {
   Package, ChevronDown, CheckCircle, Clock, AlertTriangle,
   Shield, Zap, ToggleLeft, ToggleRight, LogOut, LogIn,
@@ -307,9 +306,6 @@ const MerchantPortalPage = () => {
             isMockMode ? "border-warning/40 bg-warning/10 text-warning" : "border-success/40 bg-success/10 text-success"
           }`}>
             {isMockMode ? "Preview Mode" : "Live Mode"}
-          </div>
-          <div className="mt-2">
-            <WalletConnectCard />
           </div>
         </div>
 

@@ -272,7 +272,7 @@ const Header = () => {
             <DropdownMenu label="Integrations" icon={Plug} items={integrationItems} />
             <button
               onClick={() => setHelpOpen(true)}
-              className="flex items-center gap-1 px-2 h-9 text-xs font-semibold uppercase tracking-wide rounded whitespace-nowrap transition-colors duration-150 text-slate-300 hover:text-white hover:bg-white/10"
+              className="flex items-center gap-1 px-1.5 h-9 text-xs font-semibold uppercase tracking-wide rounded whitespace-nowrap transition-colors duration-150 text-slate-300 hover:text-white hover:bg-white/10"
             >
               <HelpCircle className="h-3.5 w-3.5 shrink-0" />
               <span className="hidden lg:inline">Help</span>
@@ -280,7 +280,7 @@ const Header = () => {
           </nav>
 
           {/* Right Controls — tight, all visible at 100% zoom desktop */}
-          <div className="flex items-center gap-1 shrink-0 overflow-visible z-40">
+          <div className="flex items-center gap-0.5 shrink-0 overflow-visible z-40">
 
             {/* Theme toggle */}
             <button

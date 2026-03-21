@@ -1,15 +1,11 @@
 // WalletContext — HashConnect v3 wallet provider
-// Uses correct v3 API: events registered BEFORE init(), openPairingModal() triggers extension popup.
-// 30s timeout resets isConnecting if user closes popup without pairing.
-// Connect ONLY on explicit user click. No auto-connect.
+// Events registered BEFORE init(). openPairingModal() triggers extension popup.
+// No auto-connect. Connect ONLY on explicit user click.
 
-import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore — hashconnect is installed on Vercel; not in local node_modules
-import { HashConnect, SessionData } from "hashconnect";
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
+// @ts-ignore — hashconnect installed on Vercel; may not be in local node_modules
+import { HashConnect } from "hashconnect";
 
-// WalletConnect project ID — required by HashConnect v3 (WalletConnect standard)
-// Get one free at https://cloud.walletconnect.com
 const WC_PROJECT_ID = "2af6f5e4a8b3c1d7e9f0a2b4c6d8e0f2";
 
 type WalletContextType = {
@@ -50,14 +46,18 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [balance, setBalance] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hcInstance, setHcInstance] = useState<HashConnect | null>(null);
+  const hcRef = useRef<InstanceType<typeof HashConnect> | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Restore balance on mount for persisted account
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved && !balance) {
+    if (saved) {
       fetchBalance(saved).then(bal => { if (bal) setBalance(bal); });
     }
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -83,11 +83,14 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setIsConnecting(true);
     setError(null);
 
-    // Safety timeout — reset after 30s if user closes popup without pairing
-    const timeoutId = setTimeout(() => {
+    // Clear any previous timeout
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+
+    // 45s safety timeout — only fires if user never interacts with HashPack popup
+    timeoutRef.current = setTimeout(() => {
       setIsConnecting(false);
-      setError("Connection timed out. Please try again.");
-    }, 30_000);
+      // Don't show error — user may have just closed the modal
+    }, 45_000);
 
     try {
       const appMetadata = {
@@ -97,13 +100,14 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         url: window.location.origin,
       };
 
-      // HashConnect v3: (LedgerId, projectId, appMetadata, debug)
-      // "testnet" is the string value of LedgerId.TESTNET — avoids @hashgraph/sdk import
-      const hc = new HashConnect("testnet" as unknown as Parameters<typeof HashConnect>[0], WC_PROJECT_ID, appMetadata, true);
+      // HashConnect v3 constructor: (LedgerId, projectId, appMetadata, debug)
+      // Pass "testnet" string directly — avoids @hashgraph/sdk static import
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const hc = new HashConnect("testnet" as any, WC_PROJECT_ID, appMetadata, false);
 
-      // ⚠️ Register events BEFORE calling init() — docs say some events fire immediately on init
-      hc.pairingEvent.on(async (pairingData: SessionData) => {
-        clearTimeout(timeoutId);
+      // ⚠️ Register ALL events BEFORE init() — some fire immediately on init
+      hc.pairingEvent.on(async (pairingData: { accountIds?: string[] }) => {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
         const acct = pairingData.accountIds?.[0];
         if (!acct) {
           setError("No account returned from HashPack.");
@@ -112,49 +116,62 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
         localStorage.setItem(STORAGE_KEY, acct);
         setAccountId(acct);
-        setHcInstance(hc);
-        const bal = await fetchBalance(acct);
-        setBalance(bal);
+        hcRef.current = hc;
         setIsConnecting(false);
+        setError(null);
+        // Fetch balance in background — don't block UI
+        fetchBalance(acct).then(bal => { if (bal) setBalance(bal); });
       });
 
       hc.disconnectionEvent.on(() => {
         localStorage.removeItem(STORAGE_KEY);
         setAccountId(null);
         setBalance(null);
-        setHcInstance(null);
+        hcRef.current = null;
       });
 
-      // init() — if HashPack extension is detected, it auto-pops the extension
+      hc.connectionStatusChangeEvent?.on((status: string) => {
+        // If status goes to Disconnected while connecting, clear spinner
+        if (status === "Disconnected" && isConnecting) {
+          if (timeoutRef.current) clearTimeout(timeoutRef.current);
+          setIsConnecting(false);
+        }
+      });
+
+      // init() — detects HashPack extension and auto-pops it if found
       await hc.init();
 
-      // openPairingModal() shows QR + pairing code as fallback (also triggers extension)
+      // openPairingModal() — shows WalletConnect QR modal + triggers extension popup
       hc.openPairingModal();
 
     } catch (e: unknown) {
-      clearTimeout(timeoutId);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
       const msg = e instanceof Error ? e.message : String(e);
-      const dismissed =
+      const isDismissed =
         msg.toLowerCase().includes("rejected") ||
         msg.toLowerCase().includes("cancelled") ||
         msg.toLowerCase().includes("closed") ||
-        msg.toLowerCase().includes("user denied");
-      setError(dismissed ? null : msg || "Failed to connect. Is HashPack installed?");
+        msg.toLowerCase().includes("user denied") ||
+        msg.toLowerCase().includes("modal");
+      if (!isDismissed) {
+        setError(msg || "Failed to connect. Is HashPack installed?");
+      }
       setIsConnecting(false);
     }
   }, [isConnecting, fetchBalance]);
 
   const disconnectWallet = useCallback(() => {
-    if (hcInstance) {
-      try { hcInstance.disconnect(); } catch { /* ignore */ }
+    if (hcRef.current) {
+      try { hcRef.current.disconnect(); } catch { /* ignore */ }
+      hcRef.current = null;
     }
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
     localStorage.removeItem(STORAGE_KEY);
     setAccountId(null);
     setBalance(null);
-    setHcInstance(null);
     setError(null);
     setIsConnecting(false);
-  }, [hcInstance]);
+  }, []);
 
   const refreshBalance = useCallback(async () => {
     if (!accountId) return;
@@ -163,9 +180,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [accountId, fetchBalance]);
 
   const isConnected = !!accountId;
-  const wallet = isConnected && accountId
-    ? { accountId, network: "testnet" }
-    : null;
+  const wallet = isConnected && accountId ? { accountId, network: "testnet" } : null;
 
   return (
     <WalletContext.Provider value={{

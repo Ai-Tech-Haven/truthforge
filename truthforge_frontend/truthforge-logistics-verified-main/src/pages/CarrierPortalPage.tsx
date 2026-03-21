@@ -3,7 +3,6 @@ import { useMockMode } from "@/contexts/MockModeContext";
 import { mockShipments, mockPortTrustReceipts, ShipmentTracking } from "@/lib/mock-data";
 import { apiFetch } from "@/lib/api-client";
 import LiveModeBanner from "@/components/LiveModeBanner";
-import WalletConnectCard from "@/components/WalletConnectCard";
 import {
   Ship, Plane, Truck, CheckCircle, AlertTriangle, Clock,
   Package, ExternalLink, ChevronDown, LogIn, LogOut,
@@ -275,9 +274,7 @@ const CarrierPortalPage = () => {
           }`}>
             {isMockMode ? "Mock Mode - Simulated Responses" : "Live Mode - Connected to Backend"}
           </div>
-          <div className="mt-2">
-            <WalletConnectCard />
-          </div>
+
         </div>
 
         <div className="flex items-center gap-2 flex-wrap justify-end">
