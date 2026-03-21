@@ -173,6 +173,86 @@ def create_app(
                 return jsonify({"carrier": carrier, "status": "disconnected"}), 200
         return jsonify({"carrier": carrier, "status": "connected"}), 200
 
+    # ── HCS proof endpoint ───────────────────────────────────────────────────
+    @app.route('/api/hcs/messages', methods=['GET'])
+    def get_hcs_messages():
+        """
+        GET /api/hcs/messages?limit=20
+        Returns recent HCS topic messages from the Hedera Mirror Node.
+        In live mode: real on-chain messages with consensus timestamps.
+        In mock mode: returns empty list (no real topic).
+        """
+        try:
+            config = app.config['TRUTHFORGE_CONFIG']
+            limit = min(int(request.args.get("limit", 20)), 100)
+            topic_id = request.args.get("topic_id", config.hcs_topic_id)
+
+            if config.mock_mode:
+                return jsonify({
+                    "topic_id": topic_id or "0.0.12345",
+                    "network": config.hedera_network,
+                    "messages": [],
+                    "mock": True,
+                    "note": "Switch to Live mode to see real HCS messages",
+                }), 200
+
+            # Live mode: fetch from mirror node
+            network = config.hedera_network
+            mirror_base = (
+                "https://testnet.mirrornode.hedera.com"
+                if network == "testnet"
+                else "https://mainnet-public.mirrornode.hedera.com"
+            )
+            url = f"{mirror_base}/api/v1/topics/{topic_id}/messages"
+            resp = requests.get(
+                url,
+                params={"limit": limit, "order": "desc"},
+                timeout=10,
+            )
+
+            if resp.status_code == 200:
+                raw_messages = resp.json().get("messages", [])
+                messages = []
+                for m in raw_messages:
+                    import base64
+                    decoded = ""
+                    try:
+                        decoded = base64.b64decode(m.get("message", "")).decode("utf-8")
+                    except Exception:
+                        decoded = m.get("message", "")
+
+                    tx_id = m.get("transaction_id", "")
+                    messages.append({
+                        "sequence_number": m.get("sequence_number"),
+                        "consensus_timestamp": m.get("consensus_timestamp"),
+                        "transaction_id": tx_id,
+                        "message": decoded,
+                        "hashscan_url": (
+                            f"https://hashscan.io/{network}/transaction/{tx_id}"
+                            if tx_id else None
+                        ),
+                    })
+
+                return jsonify({
+                    "topic_id": topic_id,
+                    "network": network,
+                    "count": len(messages),
+                    "messages": messages,
+                    "topic_url": f"https://hashscan.io/{network}/topic/{topic_id}",
+                }), 200
+            else:
+                logger.warning(f"Mirror node returned {resp.status_code} for topic {topic_id}")
+                return jsonify({
+                    "topic_id": topic_id,
+                    "network": network,
+                    "messages": [],
+                    "error": f"Mirror node returned {resp.status_code}",
+                }), 200
+
+        except Exception as e:
+            logger.error(f"Error fetching HCS messages: {e}", exc_info=True)
+            return handle_error("INTERNAL_ERROR", "Failed to fetch HCS messages", 500)
+
     # Register error handlers
     register_error_handlers(app)
     

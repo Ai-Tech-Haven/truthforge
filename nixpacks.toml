@@ -1,2 +1,8 @@
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+
 [phases.install]
-cmds = ["pip install --no-cache-dir -r requirements.txt"]
+cmds = [
+  "npm install --production",
+  "pip install --no-cache-dir -r requirements.txt"
+]
