@@ -1,95 +1,105 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 // @ts-ignore — hashconnect installed on Vercel; may not be in local node_modules
-import { HashConnect } from 'hashconnect'
+import { HashConnect } from 'hashconnect';
 
-type WalletContextType = {
-  isConnected: boolean
-  accountId: string | null
-  connectWallet: () => Promise<void>
-  disconnectWallet: () => void
-  loading: boolean
-  error: string | null
-}
+const WalletContext = createContext<any>(null);
 
-const WalletContext = createContext<WalletContextType | null>(null)
+const WC_PROJECT_ID = '2af6f5e4a8b3c1d7e9f0a2b4c6d8e0f2';
 
 export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
-  const hashConnect = useRef<HashConnect | null>(null)
+  const hashconnectRef = useRef<HashConnect | null>(null);
+  const initializedRef = useRef(false);
 
-  const [accountId, setAccountId] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [accountId, setAccountId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    if (typeof window === 'undefined' || initializedRef.current) return;
 
-    // ✅ Correct: constructor takes NO arguments
-    hashConnect.current = new HashConnect()
-  }, [])
+    const appMetadata = {
+      name: 'TruthForge',
+      description: 'Live Trade Verification',
+      icons: [`${window.location.origin}/favicon.png`],
+      url: window.location.origin,
+    };
+
+    // v3: new HashConnect(LedgerId, projectId, appMetadata, debug)
+    // Cast 'testnet' string to avoid @hashgraph/sdk static import
+    const hc = new HashConnect(
+      'testnet' as any,
+      WC_PROJECT_ID,
+      appMetadata,
+      false
+    );
+
+    hashconnectRef.current = hc;
+    initializedRef.current = true;
+
+    // Register events BEFORE init() — some fire immediately on init
+    hc.pairingEvent.on((data: { accountIds?: string[] }) => {
+      if (data?.accountIds?.length) {
+        setAccountId(data.accountIds[0]);
+        setLoading(false);
+        setError(null);
+      }
+    });
+
+    hc.disconnectionEvent.on(() => {
+      setAccountId(null);
+    });
+
+    hc.connectionStatusChangeEvent?.on((status: string) => {
+      if (status === 'Disconnected') {
+        setLoading(false);
+      }
+    });
+
+    // init() on mount — does NOT auto-connect, just prepares the instance
+    hc.init().catch((e: unknown) => {
+      console.warn('[HashConnect] init error:', e);
+    });
+  }, []);
 
   const connectWallet = async () => {
-    if (!hashConnect.current) return
+    if (!hashconnectRef.current) return;
 
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
 
     try {
-      console.log('[HashPack] init()')
-
-      const initData = await hashConnect.current.init({
-        network: 'testnet',
-        name: 'TruthForge',
-        description: 'Verifiable Intelligence Layer for Global Trade',
-        icon: `${window.location.origin}/favicon.png`
-      })
-
-      if (!initData.pairingString) {
-        throw new Error('Pairing string not generated')
-      }
-
-      console.log('[HashPack] Opening extension')
-
-      const result = await hashConnect.current.connectToLocalWallet(
-        initData.pairingString
-      )
-
-      if (result?.accountIds?.length) {
-        setAccountId(result.accountIds[0])
-        console.log('[HashPack] Connected:', result.accountIds[0])
-      } else {
-        throw new Error('No account returned from HashPack')
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Wallet connection failed'
-      console.error('[HashPack ERROR]', err)
-      setError(msg)
-    } finally {
-      setLoading(false)
+      // openPairingModal() — triggers HashPack Chrome extension popup
+      await hashconnectRef.current.openPairingModal();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to open HashPack';
+      console.error('[HashConnect]', e);
+      setError('Make sure HashPack extension is installed.');
+      setLoading(false);
     }
-  }
+    // loading stays true until pairingEvent fires with accountIds
+  };
 
   const disconnectWallet = () => {
-    setAccountId(null)
-  }
+    if (hashconnectRef.current) {
+      try { hashconnectRef.current.disconnect(); } catch { /* ignore */ }
+    }
+    setAccountId(null);
+    setLoading(false);
+    setError(null);
+  };
 
   return (
-    <WalletContext.Provider
-      value={{
-        isConnected: !!accountId,
-        accountId,
-        connectWallet,
-        disconnectWallet,
-        loading,
-        error
-      }}
-    >
+    <WalletContext.Provider value={{
+      connectWallet,
+      disconnectWallet,
+      accountId,
+      isConnected: !!accountId,
+      loading,
+      error,
+    }}>
       {children}
     </WalletContext.Provider>
-  )
-}
+  );
+};
 
-export const useWallet = () => {
-  const ctx = useContext(WalletContext)
-  if (!ctx) throw new Error('useWallet must be used inside WalletProvider')
-  return ctx
-}
+export const useWallet = () => useContext(WalletContext);

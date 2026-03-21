@@ -1,36 +1,36 @@
 // WalletConnectCard — compact wallet button in header.
-// Uses init() + connectToLocalWallet() via WalletContext.
-// No auto-connect. No SDK. No polyfills.
+// Calls connectWallet() directly → openPairingModal() → HashPack extension popup.
+// No href, no download fallback on connect button.
 
-import { useState, useRef, useEffect } from 'react'
-import { useWallet } from '@/contexts/WalletContext'
-import { Wallet, LogOut, ExternalLink, ChevronDown, Download, Zap, RefreshCw } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react';
+import { useWallet } from '@/contexts/WalletContext';
+import { Wallet, LogOut, ExternalLink, ChevronDown, Download, RefreshCw } from 'lucide-react';
 
 function shortAddr(id: string): string {
-  if (id.length <= 12) return id
-  return id.slice(0, 7) + '…' + id.slice(-3)
+  if (id.length <= 12) return id;
+  return id.slice(0, 7) + '…' + id.slice(-3);
 }
 
 const WalletConnectCard = () => {
-  const { accountId, isConnected, loading, error, connectWallet, disconnectWallet } = useWallet()
+  const { accountId, isConnected, loading, error, connectWallet, disconnectWallet } = useWallet();
 
-  const [dropdownOpen, setDropdownOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
-        setDropdownOpen(false)
+        setDropdownOpen(false);
       }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   // Close dropdown after successful connection
   useEffect(() => {
-    if (isConnected) setDropdownOpen(false)
-  }, [isConnected])
+    if (isConnected) setDropdownOpen(false);
+  }, [isConnected]);
 
   // ── Connected ──────────────────────────────────────────────────────────────
   if (isConnected && accountId) {
@@ -70,7 +70,7 @@ const WalletConnectCard = () => {
               View on HashScan
             </a>
             <button
-              onClick={() => { disconnectWallet(); setDropdownOpen(false) }}
+              onClick={() => { disconnectWallet(); setDropdownOpen(false); }}
               className="w-full flex items-center gap-2 px-3 py-2 text-[10px] text-destructive hover:bg-destructive/10 transition-colors border-t border-border mt-1"
             >
               <LogOut className="h-3 w-3" />
@@ -79,7 +79,7 @@ const WalletConnectCard = () => {
           </div>
         )}
       </div>
-    )
+    );
   }
 
   // ── Not connected ──────────────────────────────────────────────────────────
@@ -106,7 +106,7 @@ const WalletConnectCard = () => {
             </div>
           )}
 
-          {/* Connect HashPack — triggers extension popup via init() + connectToLocalWallet() */}
+          {/* Connect button — calls connectWallet() directly, no href */}
           <button
             onClick={connectWallet}
             disabled={loading}
@@ -114,11 +114,11 @@ const WalletConnectCard = () => {
           >
             {loading
               ? <><RefreshCw className="h-3 w-3 animate-spin" /> Connecting…</>
-              : <><Zap className="h-3 w-3" /> Connect HashPack</>
+              : <><Wallet className="h-3 w-3" /> Connect HashPack</>
             }
           </button>
 
-          {/* Download fallback */}
+          {/* Download link — separate, not the connect button */}
           <a
             href="https://www.hashpack.app/download"
             target="_blank"
@@ -132,7 +132,7 @@ const WalletConnectCard = () => {
         </div>
       )}
     </div>
-  )
-}
+  );
+};
 
-export default WalletConnectCard
+export default WalletConnectCard;
