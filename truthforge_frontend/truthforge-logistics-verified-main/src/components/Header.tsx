@@ -245,7 +245,7 @@ const Header = () => {
         the absolutely-positioned dropdown panels.
         h-14 is fixed — no padding/height changes on hover.
       */}
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0a1628]/95 backdrop-blur overflow-visible">
+      <header className="sticky top-0 z-50 bg-[#0a1628]/95 backdrop-blur overflow-visible">
         <div className="container flex h-14 items-center justify-between gap-3 overflow-visible">
 
           {/* Logo — transition-opacity only, no layout shift */}
@@ -280,7 +280,7 @@ const Header = () => {
           </nav>
 
           {/* Right Controls — tight, all visible at 100% zoom desktop */}
-          <div className="flex items-center gap-1 shrink-0 overflow-visible z-40 border-l border-white/10 pl-2">
+          <div className="flex items-center gap-1 shrink-0 overflow-visible z-40">
 
             {/* Theme toggle */}
             <button

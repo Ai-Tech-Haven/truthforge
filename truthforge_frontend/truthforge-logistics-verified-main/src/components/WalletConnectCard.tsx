@@ -131,12 +131,15 @@ const WalletConnectCard = () => {
 
           {/* Connect HashPack — opens extension popup via hashconnect */}
           <button
-            onClick={async () => { await connectWallet(); setDropdownOpen(false); }}
+            onClick={async () => {
+              await connectWallet();
+              // Only close if connection succeeded (accountId will be set)
+            }}
             disabled={isConnecting}
             className="flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-lg bg-accent text-white text-xs font-bold uppercase tracking-wider hover:bg-accent/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-2"
           >
             {isConnecting
-              ? <><RefreshCw className="h-3 w-3 animate-spin" /> Connecting…</>
+              ? <><RefreshCw className="h-3 w-3 animate-spin" /> Waiting for HashPack…</>
               : <><Zap className="h-3 w-3" /> Connect HashPack</>
             }
           </button>

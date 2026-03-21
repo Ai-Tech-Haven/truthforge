@@ -1,9 +1,16 @@
-// WalletContext — HashConnect-based wallet provider
-// Uses hashconnect package to open HashPack Chrome extension popup.
-// Connect ONLY on explicit user click. No auto-connect. No SDK imports.
+// WalletContext — HashConnect v3 wallet provider
+// Uses correct v3 API: events registered BEFORE init(), openPairingModal() triggers extension popup.
+// 30s timeout resets isConnecting if user closes popup without pairing.
+// Connect ONLY on explicit user click. No auto-connect.
 
-import React, { createContext, useContext, useState, useCallback } from "react";
-import { HashConnect } from "hashconnect";
+import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore — hashconnect is installed on Vercel; not in local node_modules
+import { HashConnect, SessionData } from "hashconnect";
+
+// WalletConnect project ID — required by HashConnect v3 (WalletConnect standard)
+// Get one free at https://cloud.walletconnect.com
+const WC_PROJECT_ID = "2af6f5e4a8b3c1d7e9f0a2b4c6d8e0f2";
 
 type WalletContextType = {
   isConnected: boolean;
@@ -15,7 +22,6 @@ type WalletContextType = {
   refreshBalance: () => Promise<void>;
   isConnecting: boolean;
   error: string | null;
-  // Legacy compat shape used by MerchantPortalPage / LiveModeBanner
   wallet: { accountId: string; network: string } | null;
 };
 
@@ -46,6 +52,15 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [error, setError] = useState<string | null>(null);
   const [hcInstance, setHcInstance] = useState<HashConnect | null>(null);
 
+  // Restore balance on mount for persisted account
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved && !balance) {
+      fetchBalance(saved).then(bal => { if (bal) setBalance(bal); });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const fetchBalance = useCallback(async (id: string): Promise<string | null> => {
     try {
       const res = await fetch(
@@ -61,30 +76,40 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, []);
 
-  // connectWallet — MUST be called from explicit user click only
   const connectWallet = useCallback(async () => {
     if (typeof window === "undefined") return;
+    if (isConnecting) return;
+
     setIsConnecting(true);
     setError(null);
 
+    // Safety timeout — reset after 30s if user closes popup without pairing
+    const timeoutId = setTimeout(() => {
+      setIsConnecting(false);
+      setError("Connection timed out. Please try again.");
+    }, 30_000);
+
     try {
-      const hc = new HashConnect(
-        true,       // debug
-        "testnet",
-        {
-          name: "TruthForge",
-          description: "Verifiable Trade Intelligence",
-          icon: `${window.location.origin}/favicon.png`,
+      const appMetadata = {
+        name: "TruthForge",
+        description: "Verifiable Trade Intelligence",
+        icons: [`${window.location.origin}/favicon.png`],
+        url: window.location.origin,
+      };
+
+      // HashConnect v3: (LedgerId, projectId, appMetadata, debug)
+      // "testnet" is the string value of LedgerId.TESTNET — avoids @hashgraph/sdk import
+      const hc = new HashConnect("testnet" as unknown as Parameters<typeof HashConnect>[0], WC_PROJECT_ID, appMetadata, true);
+
+      // ⚠️ Register events BEFORE calling init() — docs say some events fire immediately on init
+      hc.pairingEvent.on(async (pairingData: SessionData) => {
+        clearTimeout(timeoutId);
+        const acct = pairingData.accountIds?.[0];
+        if (!acct) {
+          setError("No account returned from HashPack.");
+          setIsConnecting(false);
+          return;
         }
-      );
-
-      await hc.init();
-
-      // THIS opens the HashPack Chrome extension popup
-      await hc.pair();
-
-      hc.pairingEvent.once(async (pairingData) => {
-        const acct = pairingData.accountIds[0];
         localStorage.setItem(STORAGE_KEY, acct);
         setAccountId(acct);
         setHcInstance(hc);
@@ -93,16 +118,31 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setIsConnecting(false);
       });
 
+      hc.disconnectionEvent.on(() => {
+        localStorage.removeItem(STORAGE_KEY);
+        setAccountId(null);
+        setBalance(null);
+        setHcInstance(null);
+      });
+
+      // init() — if HashPack extension is detected, it auto-pops the extension
+      await hc.init();
+
+      // openPairingModal() shows QR + pairing code as fallback (also triggers extension)
+      hc.openPairingModal();
+
     } catch (e: unknown) {
+      clearTimeout(timeoutId);
       const msg = e instanceof Error ? e.message : String(e);
       const dismissed =
         msg.toLowerCase().includes("rejected") ||
         msg.toLowerCase().includes("cancelled") ||
-        msg.toLowerCase().includes("closed");
-      setError(dismissed ? null : msg);
+        msg.toLowerCase().includes("closed") ||
+        msg.toLowerCase().includes("user denied");
+      setError(dismissed ? null : msg || "Failed to connect. Is HashPack installed?");
       setIsConnecting(false);
     }
-  }, [fetchBalance]);
+  }, [isConnecting, fetchBalance]);
 
   const disconnectWallet = useCallback(() => {
     if (hcInstance) {
@@ -113,6 +153,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setBalance(null);
     setHcInstance(null);
     setError(null);
+    setIsConnecting(false);
   }, [hcInstance]);
 
   const refreshBalance = useCallback(async () => {
