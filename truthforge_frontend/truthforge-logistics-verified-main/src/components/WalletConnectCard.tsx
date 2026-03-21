@@ -1,45 +1,36 @@
-// WalletConnectCard — compact wallet button with dropdown popup below it.
-// "Connect HashPack" → opens HashPack Chrome extension via hashconnect.
-// "Download HashPack" → opens hashpack.app/download in new tab.
-// No auto-connect. No full-screen modal. No SDK.
+// WalletConnectCard — compact wallet button in header.
+// Uses init() + connectToLocalWallet() via WalletContext.
+// No auto-connect. No SDK. No polyfills.
 
-import { useState, useRef, useEffect } from "react";
-import { useWallet } from "@/contexts/WalletContext";
-import {
-  Wallet, LogOut, RefreshCw, ExternalLink,
-  ChevronDown, Download, Zap,
-} from "lucide-react";
+import { useState, useRef, useEffect } from 'react'
+import { useWallet } from '@/contexts/WalletContext'
+import { Wallet, LogOut, ExternalLink, ChevronDown, Download, Zap, RefreshCw } from 'lucide-react'
 
 function shortAddr(id: string): string {
-  if (id.length <= 12) return id;
-  return id.slice(0, 7) + "…" + id.slice(-3);
+  if (id.length <= 12) return id
+  return id.slice(0, 7) + '…' + id.slice(-3)
 }
 
 const WalletConnectCard = () => {
-  const {
-    accountId, balance, isConnected, isConnecting,
-    error, connectWallet, disconnectWallet, refreshBalance,
-  } = useWallet();
+  const { accountId, isConnected, loading, error, connectWallet, disconnectWallet } = useWallet()
 
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
-        setDropdownOpen(false);
+        setDropdownOpen(false)
       }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await refreshBalance();
-    setRefreshing(false);
-  };
+  // Close dropdown after successful connection
+  useEffect(() => {
+    if (isConnected) setDropdownOpen(false)
+  }, [isConnected])
 
   // ── Connected ──────────────────────────────────────────────────────────────
   if (isConnected && accountId) {
@@ -48,13 +39,10 @@ const WalletConnectCard = () => {
         <button
           onClick={() => setDropdownOpen(o => !o)}
           className="flex items-center gap-1 rounded border border-success/40 bg-success/10 px-2 h-7 hover:bg-success/15 transition-colors"
-          aria-haspopup="true"
-          aria-expanded={dropdownOpen}
         >
           <span className="h-1.5 w-1.5 rounded-full bg-success shrink-0" />
           <span className="font-mono text-[9px] text-success hidden sm:block">{shortAddr(accountId)}</span>
-          {balance && <span className="text-[9px] text-success/70 hidden lg:block ml-0.5">{balance}</span>}
-          <ChevronDown className={`h-2.5 w-2.5 text-success/60 transition-transform ml-0.5 ${dropdownOpen ? "rotate-180" : ""}`} />
+          <ChevronDown className={`h-2.5 w-2.5 text-success/60 transition-transform ml-0.5 ${dropdownOpen ? 'rotate-180' : ''}`} />
         </button>
 
         {dropdownOpen && (
@@ -70,16 +58,7 @@ const WalletConnectCard = () => {
               >
                 {accountId}<ExternalLink className="h-2.5 w-2.5 shrink-0" />
               </a>
-              {balance && <div className="text-[10px] text-success mt-0.5 font-medium">{balance}</div>}
             </div>
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="w-full flex items-center gap-2 px-3 py-2 text-[10px] text-foreground hover:bg-secondary transition-colors"
-            >
-              <RefreshCw className={`h-3 w-3 text-muted-foreground ${refreshing ? "animate-spin" : ""}`} />
-              {refreshing ? "Refreshing..." : "Refresh Balance"}
-            </button>
             <a
               href={`https://hashscan.io/testnet/account/${accountId}`}
               target="_blank"
@@ -91,7 +70,7 @@ const WalletConnectCard = () => {
               View on HashScan
             </a>
             <button
-              onClick={() => { disconnectWallet(); setDropdownOpen(false); }}
+              onClick={() => { disconnectWallet(); setDropdownOpen(false) }}
               className="w-full flex items-center gap-2 px-3 py-2 text-[10px] text-destructive hover:bg-destructive/10 transition-colors border-t border-border mt-1"
             >
               <LogOut className="h-3 w-3" />
@@ -100,21 +79,19 @@ const WalletConnectCard = () => {
           </div>
         )}
       </div>
-    );
+    )
   }
 
-  // ── Not connected — button + small dropdown below ──────────────────────────
+  // ── Not connected ──────────────────────────────────────────────────────────
   return (
     <div className="relative z-50" ref={ref}>
       <button
         onClick={() => setDropdownOpen(o => !o)}
         className="flex items-center gap-1 px-2 h-7 rounded border border-accent/50 bg-accent/10 text-accent text-[10px] font-bold uppercase tracking-wider hover:bg-accent/20 transition-colors whitespace-nowrap"
-        aria-haspopup="true"
-        aria-expanded={dropdownOpen}
       >
         <Wallet className="h-2.5 w-2.5 shrink-0" />
         <span className="hidden sm:inline">Connect</span>
-        <ChevronDown className={`h-2.5 w-2.5 transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
+        <ChevronDown className={`h-2.5 w-2.5 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {dropdownOpen && (
@@ -129,22 +106,19 @@ const WalletConnectCard = () => {
             </div>
           )}
 
-          {/* Connect HashPack — opens extension popup via hashconnect */}
+          {/* Connect HashPack — triggers extension popup via init() + connectToLocalWallet() */}
           <button
-            onClick={async () => {
-              await connectWallet();
-              // Only close if connection succeeded (accountId will be set)
-            }}
-            disabled={isConnecting}
+            onClick={connectWallet}
+            disabled={loading}
             className="flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-lg bg-accent text-white text-xs font-bold uppercase tracking-wider hover:bg-accent/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-2"
           >
-            {isConnecting
-              ? <><RefreshCw className="h-3 w-3 animate-spin" /> Waiting for HashPack…</>
+            {loading
+              ? <><RefreshCw className="h-3 w-3 animate-spin" /> Connecting…</>
               : <><Zap className="h-3 w-3" /> Connect HashPack</>
             }
           </button>
 
-          {/* Download — opens hashpack.app in new tab */}
+          {/* Download fallback */}
           <a
             href="https://www.hashpack.app/download"
             target="_blank"
@@ -158,7 +132,7 @@ const WalletConnectCard = () => {
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default WalletConnectCard;
+export default WalletConnectCard
