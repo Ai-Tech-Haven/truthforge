@@ -1,22 +1,28 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
-// @ts-ignore — hashconnect installed on Vercel; may not be in local node_modules
-import { HashConnect } from 'hashconnect';
+// @ts-ignore — hashconnect installed on Vercel; not in local node_modules
+import { HashConnect, HashConnectConnectionState } from 'hashconnect';
 
 const WalletContext = createContext<any>(null);
 
-// Read from Vite env — set VITE_WC_PROJECT_ID in .env (local) and Vercel env vars (production)
 const WC_PROJECT_ID = import.meta.env.VITE_WC_PROJECT_ID as string;
 const TIMEOUT_MS = 12_000;
 
+// Persist pairing across page reloads
+const STORAGE_KEY = 'tf_hc_account';
+
 export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
   const hcRef = useRef<HashConnect | null>(null);
-  const initPromiseRef = useRef<Promise<void> | null>(null);
+  const initDoneRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryRef = useRef(false);
 
-  const [accountId, setAccountId] = useState<string | null>(null);
+  // Restore from localStorage so UI shows "Connected" immediately on reload
+  const [accountId, setAccountId] = useState<string | null>(
+    () => localStorage.getItem(STORAGE_KEY)
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [connState, setConnState] = useState<string>('Disconnected');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -32,16 +38,20 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
       url: window.location.origin,
     };
 
-    // v3: new HashConnect(LedgerId, projectId, appMetadata, debug)
-    // Cast 'testnet' string to avoid @hashgraph/sdk static import
     const hc = new HashConnect('testnet' as any, WC_PROJECT_ID, appMetadata, false);
     hcRef.current = hc;
 
-    // Register events BEFORE init() — some fire immediately on init
-    hc.pairingEvent.on((data: { accountIds?: string[] }) => {
+    // ── Events registered BEFORE init() ──────────────────────────────────────
+
+    // pairingEvent fires on init() if a saved session exists (session restore),
+    // AND fires again when user approves a new pairing in the extension.
+    hc.pairingEvent.on((data: { accountIds?: string[]; network?: string }) => {
+      console.log('[HashConnect] pairingEvent:', data);
       if (data?.accountIds?.length) {
+        const id = data.accountIds[0];
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        setAccountId(data.accountIds[0]);
+        setAccountId(id);
+        localStorage.setItem(STORAGE_KEY, id);
         setLoading(false);
         setError(null);
         retryRef.current = false;
@@ -49,19 +59,36 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
     });
 
     hc.disconnectionEvent?.on(() => {
+      console.log('[HashConnect] disconnectionEvent');
       setAccountId(null);
+      localStorage.removeItem(STORAGE_KEY);
+      setConnState('Disconnected');
     });
 
+    // connectionStatusChangeEvent: "Connecting" | "Connected" | "Disconnected" | "Paired"
     hc.connectionStatusChangeEvent?.on((status: string) => {
-      if (status === 'Disconnected') {
+      console.log('[HashConnect] connectionStatus:', status);
+      setConnState(status);
+      // If status goes to Paired/Connected and we have an account, clear loading
+      if (status === HashConnectConnectionState?.Paired || status === 'Paired') {
+        setLoading(false);
+      }
+      if (status === HashConnectConnectionState?.Disconnected || status === 'Disconnected') {
         setLoading(false);
       }
     });
 
-    // init() on mount — stored so connectWallet can await it
-    initPromiseRef.current = hc.init().catch((e: unknown) => {
-      console.warn('[HashConnect] init error:', e);
-    });
+    // init() — restores existing WalletConnect session if one exists.
+    // pairingEvent will fire synchronously during init if session is found.
+    hc.init()
+      .then(() => {
+        initDoneRef.current = true;
+        console.log('[HashConnect] init() complete');
+      })
+      .catch((e: unknown) => {
+        initDoneRef.current = true;
+        console.warn('[HashConnect] init error:', e);
+      });
 
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -70,15 +97,13 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const _attemptConnect = async () => {
-    if (!hcRef.current) return;
-
-    // Wait for init() to fully resolve before opening modal
-    if (initPromiseRef.current) await initPromiseRef.current;
+    const hc = hcRef.current;
+    if (!hc) return;
 
     setLoading(true);
     setError(null);
 
-    // 12-second timeout — auto-retry once if extension doesn't respond
+    // Timeout — auto-retry once
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(async () => {
       if (!retryRef.current) {
@@ -93,19 +118,22 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
     }, TIMEOUT_MS);
 
     try {
-      // openPairingModal() — triggers HashPack Chrome extension popup instantly
-      await hcRef.current.openPairingModal();
+      // openPairingModal() triggers the HashPack extension popup.
+      // If already paired, the extension shows the existing session — user
+      // does NOT need to re-approve; pairingEvent fires immediately.
+      await hc.openPairingModal();
     } catch (e: unknown) {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      console.error('[HashConnect]', e);
-      setError('Make sure HashPack extension is installed.');
+      console.error('[HashConnect] openPairingModal error:', e);
+      setError('Make sure HashPack extension is installed and unlocked.');
       setLoading(false);
     }
   };
 
   const connectWallet = async () => {
-    console.log('[HashConnect] connectWallet called — hcRef:', hcRef.current, '| WC_PROJECT_ID set:', !!WC_PROJECT_ID);
+    console.log('[HashConnect] connectWallet — hcRef:', hcRef.current, '| WC_PROJECT_ID:', !!WC_PROJECT_ID);
     if (loading) return;
+
     if (!WC_PROJECT_ID) {
       setError('WalletConnect Project ID is not configured. Contact support.');
       return;
@@ -114,6 +142,13 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
       setError('HashConnect not initialized. Please refresh the page.');
       return;
     }
+
+    // Already connected — nothing to do
+    if (accountId) {
+      console.log('[HashConnect] already connected:', accountId);
+      return;
+    }
+
     retryRef.current = false;
     await _attemptConnect();
   };
@@ -124,9 +159,11 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
       try { hcRef.current.disconnect(); } catch { /* ignore */ }
     }
     setAccountId(null);
+    localStorage.removeItem(STORAGE_KEY);
     setLoading(false);
     setError(null);
     retryRef.current = false;
+    setConnState('Disconnected');
   };
 
   return (
@@ -137,6 +174,7 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
       isConnected: !!accountId,
       loading,
       error,
+      connState,
     }}>
       {children}
     </WalletContext.Provider>
