@@ -2,6 +2,7 @@ import { useMockMode } from "@/contexts/MockModeContext";
 import { useWallet } from "@/contexts/WalletContext";
 import { Zap, AlertTriangle, Wallet } from "lucide-react";
 
+
 /**
  * LiveModeBanner — shown at the top of portal pages.
  * LIVE MODE: prominent red/green banner with wallet status.
@@ -9,7 +10,7 @@ import { Zap, AlertTriangle, Wallet } from "lucide-react";
  */
 const LiveModeBanner = () => {
   const { isMockMode } = useMockMode();
-  const { wallet, connectWallet, isConnecting } = useWallet();
+  const { wallet } = useWallet();
 
   if (isMockMode) {
     return (
@@ -58,18 +59,9 @@ const LiveModeBanner = () => {
           Wallet connected: {wallet.accountId}
         </div>
       ) : (
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 text-[11px] text-warning">
-            <Wallet className="h-3 w-3 shrink-0" />
-            Wallet not connected — required for HBAR payment
-          </div>
-          <button
-            onClick={connectWallet}
-            disabled={isConnecting}
-            className="px-2.5 py-1 rounded border border-accent/50 bg-accent/10 text-accent text-[10px] font-heading font-bold uppercase tracking-wider hover:bg-accent/20 transition-colors disabled:opacity-50"
-          >
-            {isConnecting ? "Connecting..." : "Connect Wallet"}
-          </button>
+        <div className="flex items-center gap-1.5 text-[11px] text-warning">
+          <Wallet className="h-3 w-3 shrink-0" />
+          Wallet connection — required for HBAR payment
         </div>
       )}
     </div>
