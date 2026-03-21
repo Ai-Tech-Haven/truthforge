@@ -23,14 +23,8 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    hashConnect.current = new HashConnect(
-      'testnet',
-      {
-        name: 'TruthForge',
-        description: 'Verifiable Intelligence Layer for Global Trade',
-        icon: `${window.location.origin}/favicon.png`
-      }
-    )
+    // ✅ Correct: constructor takes NO arguments
+    hashConnect.current = new HashConnect()
   }, [])
 
   const connectWallet = async () => {
@@ -40,28 +34,34 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
     setError(null)
 
     try {
-      console.log('Initializing HashConnect')
+      console.log('[HashPack] init()')
 
-      const initData = await hashConnect.current.init()
+      const initData = await hashConnect.current.init({
+        network: 'testnet',
+        name: 'TruthForge',
+        description: 'Verifiable Intelligence Layer for Global Trade',
+        icon: `${window.location.origin}/favicon.png`
+      })
 
-      const pairingString = initData.pairingString
-      if (!pairingString) {
-        throw new Error('No pairing string generated')
+      if (!initData.pairingString) {
+        throw new Error('Pairing string not generated')
       }
 
-      console.log('Triggering HashPack extension popup')
+      console.log('[HashPack] Opening extension')
 
-      const result = await hashConnect.current.connectToLocalWallet(pairingString)
+      const result = await hashConnect.current.connectToLocalWallet(
+        initData.pairingString
+      )
 
       if (result?.accountIds?.length) {
         setAccountId(result.accountIds[0])
+        console.log('[HashPack] Connected:', result.accountIds[0])
       } else {
         throw new Error('No account returned from HashPack')
       }
-
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Wallet connection failed'
-      console.error('HashPack connect error:', err)
+      console.error('[HashPack ERROR]', err)
       setError(msg)
     } finally {
       setLoading(false)
