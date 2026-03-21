@@ -1,12 +1,11 @@
 // WalletContext — HashConnect v3 wallet provider
-// Events registered BEFORE init(). openPairingModal() triggers extension popup.
+// Constructor: new HashConnect(debug, network, appMetadata)
+// pair() triggers the HashPack Chrome extension popup instantly.
 // No auto-connect. Connect ONLY on explicit user click.
 
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 // @ts-ignore — hashconnect installed on Vercel; may not be in local node_modules
 import { HashConnect } from "hashconnect";
-
-const WC_PROJECT_ID = "2af6f5e4a8b3c1d7e9f0a2b4c6d8e0f2";
 
 type WalletContextType = {
   isConnected: boolean;
@@ -83,30 +82,26 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setIsConnecting(true);
     setError(null);
 
-    // Clear any previous timeout
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
 
-    // 45s safety timeout — only fires if user never interacts with HashPack popup
+    // 45s safety timeout — clears spinner if user never responds to HashPack
     timeoutRef.current = setTimeout(() => {
       setIsConnecting(false);
-      // Don't show error — user may have just closed the modal
     }, 45_000);
 
     try {
       const appMetadata = {
         name: "TruthForge",
-        description: "Verifiable Trade Intelligence",
-        icons: [`${window.location.origin}/favicon.png`],
-        url: window.location.origin,
+        description: "Verifiable Intelligence Layer for Global Trade",
+        icon: `${window.location.origin}/favicon.png`,
       };
 
-      // HashConnect v3 constructor: (LedgerId, projectId, appMetadata, debug)
-      // Pass "testnet" string directly — avoids @hashgraph/sdk static import
+      // HashConnect v3: new HashConnect(debug, network, appMetadata)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const hc = new HashConnect("testnet" as any, WC_PROJECT_ID, appMetadata, false);
+      const hc = new HashConnect(false, "testnet", appMetadata);
 
-      // ⚠️ Register ALL events BEFORE init() — some fire immediately on init
-      hc.pairingEvent.on(async (pairingData: { accountIds?: string[] }) => {
+      // Register pairingEvent BEFORE calling pair()
+      hc.pairingEvent.once((pairingData: { accountIds: string[] }) => {
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
         const acct = pairingData.accountIds?.[0];
         if (!acct) {
@@ -119,30 +114,18 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         hcRef.current = hc;
         setIsConnecting(false);
         setError(null);
-        // Fetch balance in background — don't block UI
         fetchBalance(acct).then(bal => { if (bal) setBalance(bal); });
       });
 
-      hc.disconnectionEvent.on(() => {
+      hc.disconnectionEvent?.on(() => {
         localStorage.removeItem(STORAGE_KEY);
         setAccountId(null);
         setBalance(null);
         hcRef.current = null;
       });
 
-      hc.connectionStatusChangeEvent?.on((status: string) => {
-        // If status goes to Disconnected while connecting, clear spinner
-        if (status === "Disconnected" && isConnecting) {
-          if (timeoutRef.current) clearTimeout(timeoutRef.current);
-          setIsConnecting(false);
-        }
-      });
-
-      // init() — detects HashPack extension and auto-pops it if found
-      await hc.init();
-
-      // openPairingModal() — shows WalletConnect QR modal + triggers extension popup
-      hc.openPairingModal();
+      // pair() — instantly triggers the HashPack Chrome extension popup
+      await hc.pair();
 
     } catch (e: unknown) {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -151,8 +134,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         msg.toLowerCase().includes("rejected") ||
         msg.toLowerCase().includes("cancelled") ||
         msg.toLowerCase().includes("closed") ||
-        msg.toLowerCase().includes("user denied") ||
-        msg.toLowerCase().includes("modal");
+        msg.toLowerCase().includes("user denied");
       if (!isDismissed) {
         setError(msg || "Failed to connect. Is HashPack installed?");
       }

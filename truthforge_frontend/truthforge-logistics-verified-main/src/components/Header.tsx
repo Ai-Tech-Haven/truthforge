@@ -262,7 +262,7 @@ const Header = () => {
 
           {/* Nav — overflow-visible so dropdowns escape the header */}
           <nav
-            className="flex items-center gap-0.5 overflow-visible flex-1"
+            className="flex items-center gap-0.5 overflow-visible"
             role="navigation"
             aria-label="Main navigation"
           >
@@ -279,8 +279,8 @@ const Header = () => {
             </button>
           </nav>
 
-          {/* Right Controls — tight, all visible at 100% zoom desktop */}
-          <div className="flex items-center gap-0.5 shrink-0 overflow-visible z-40">
+          {/* Right Controls — all grouped, tight gap, overflow-visible for wallet dropdown */}
+          <div className="ml-auto flex items-center gap-2 shrink-0 overflow-visible z-40">
 
             {/* Theme toggle */}
             <button
