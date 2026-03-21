@@ -104,7 +104,16 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const connectWallet = async () => {
+    console.log('[HashConnect] connectWallet called — hcRef:', hcRef.current, '| WC_PROJECT_ID set:', !!WC_PROJECT_ID);
     if (loading) return;
+    if (!WC_PROJECT_ID) {
+      setError('WalletConnect Project ID is not configured. Contact support.');
+      return;
+    }
+    if (!hcRef.current) {
+      setError('HashConnect not initialized. Please refresh the page.');
+      return;
+    }
     retryRef.current = false;
     await _attemptConnect();
   };
