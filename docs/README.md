@@ -30,11 +30,12 @@ When a ship carrying cargo approaches a port, customs officers have to manually 
 
 | | URL |
 |---|---|
-| 🌐 Frontend Dashboard | https://truthforge-frontend.vercel.app |
+| 🌐 Frontend Dashboard | https://truthforge-seven.vercel.app |
 | ⚙️ Backend API | https://web-production-dcd43.up.railway.app |
 | 🔗 Agent Registry on Hedera | https://hashscan.io/testnet/topic/0.0.8161249 |
 | 🧾 Sample Audit Transaction | https://hashscan.io/testnet/transaction/0.0.7974354 |
 | 🛒 Live Merchant Store | https://www.a-thi.online |
+| 📋 Product Requirements Doc | [docs/PRD.md](docs/PRD.md) |
 
 ---
 
