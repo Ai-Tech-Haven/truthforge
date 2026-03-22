@@ -1,7 +1,9 @@
 import { mockVerifications, Verification } from "@/lib/mock-data";
-import { Search, Filter, FileCheck, CheckCircle, Clock, XCircle, Radio } from "lucide-react";
-import { useState } from "react";
+import { Search, Filter, FileCheck, CheckCircle, Clock, XCircle, Radio, ExternalLink, Loader2 } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
 import { useMockMode } from "@/contexts/MockModeContext";
+
+const RAILWAY = "https://web-production-dcd43.up.railway.app";
 
 const statusConfig: Record<string, { icon: typeof CheckCircle; color: string; bg: string; label: string }> = {
   verified: { icon: CheckCircle, color: "text-success",     bg: "bg-success/10",     label: "Verified" },
@@ -9,12 +11,52 @@ const statusConfig: Record<string, { icon: typeof CheckCircle; color: string; bg
   failed:   { icon: XCircle,      color: "text-destructive", bg: "bg-destructive/10", label: "Failed"   },
 };
 
+interface LiveVerification {
+  id: string;
+  shipmentId: string;
+  type: string;
+  status: "verified" | "pending" | "failed";
+  agent: string;
+  timestamp: string;
+  hcsProof: string;
+  confidence: number;
+  hashscanUrl?: string;
+}
+
 const VerificationPage = () => {
   const { isMockMode } = useMockMode();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [liveVerifications, setLiveVerifications] = useState<LiveVerification[]>([]);
+  const [liveLoading, setLiveLoading] = useState(false);
+  const [liveError, setLiveError] = useState(false);
 
-  const filtered = mockVerifications.filter((v: Verification) => {
+  const fetchLiveVerifications = useCallback(async () => {
+    if (isMockMode) return;
+    setLiveLoading(true);
+    setLiveError(false);
+    try {
+      const res = await fetch(`${RAILWAY}/api/verifications`, { signal: AbortSignal.timeout(8000) });
+      if (res.ok) {
+        const data = await res.json();
+        setLiveVerifications(data.verifications ?? data ?? []);
+      } else {
+        setLiveError(true);
+      }
+    } catch {
+      setLiveError(true);
+    } finally {
+      setLiveLoading(false);
+    }
+  }, [isMockMode]);
+
+  useEffect(() => {
+    if (!isMockMode) fetchLiveVerifications();
+  }, [isMockMode, fetchLiveVerifications]);
+
+  const source: Verification[] = isMockMode ? mockVerifications : (liveVerifications as Verification[]);
+
+  const filtered = source.filter((v: Verification) => {
     const matchesSearch =
       v.shipmentId.toLowerCase().includes(search.toLowerCase()) ||
       v.type.toLowerCase().includes(search.toLowerCase());
@@ -24,7 +66,6 @@ const VerificationPage = () => {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-xl font-heading font-bold text-foreground flex items-center gap-2">
@@ -35,19 +76,22 @@ const VerificationPage = () => {
             Document verification outcomes with linked Hedera consensus proofs.
           </p>
         </div>
-        <span
-          className={`text-[10px] font-heading font-bold px-2 py-1 rounded uppercase tracking-wider border ${
-            isMockMode
-              ? "bg-warning/10 text-warning border-warning/30"
-              : "bg-success/10 text-success border-success/30"
-          }`}
-        >
+        <span className={`text-[10px] font-heading font-bold px-2 py-1 rounded uppercase tracking-wider border ${
+          isMockMode
+            ? "bg-warning/10 text-warning border-warning/30"
+            : "bg-success/10 text-success border-success/30"
+        }`}>
           {isMockMode ? "Preview Mode" : "Live Mode"}
         </span>
       </div>
 
-      {/* Live mode — awaiting real data */}
-      {!isMockMode && (
+      {!isMockMode && liveLoading && (
+        <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading live verifications...
+        </div>
+      )}
+
+      {!isMockMode && !liveLoading && liveVerifications.length === 0 && (
         <div className="rounded-xl border border-border bg-card p-10 text-center space-y-4">
           <div className="flex justify-center">
             <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-success/10 border border-success/30 text-success text-xs font-heading font-bold uppercase tracking-wider">
@@ -56,16 +100,24 @@ const VerificationPage = () => {
             </span>
           </div>
           <div>
-            <p className="text-sm font-medium text-foreground">Awaiting real verification data</p>
+            <p className="text-sm font-medium text-foreground">
+              {liveError ? "Could not reach backend" : "Awaiting real verification data"}
+            </p>
             <p className="text-xs text-muted-foreground mt-1">
-              No verifications have been processed yet. Data will appear here automatically once the backend processes real shipments.
+              {liveError
+                ? "Backend may be starting up. Refresh to retry."
+                : "Data will appear here once the backend processes real shipments."}
             </p>
           </div>
+          {liveError && (
+            <button onClick={fetchLiveVerifications} className="text-xs text-accent hover:underline">
+              Retry
+            </button>
+          )}
         </div>
       )}
 
-      {/* Mock mode — full table */}
-      {isMockMode && (
+      {(isMockMode || (!liveLoading && liveVerifications.length > 0)) && (
         <>
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
@@ -107,7 +159,7 @@ const VerificationPage = () => {
                   <th className="py-3 px-4 text-left text-[10px] font-heading font-bold text-muted-foreground uppercase tracking-wider w-[90px]">Status</th>
                   <th className="py-3 px-4 text-left text-[10px] font-heading font-bold text-muted-foreground uppercase tracking-wider w-[140px]">Agent</th>
                   <th className="py-3 px-4 text-left text-[10px] font-heading font-bold text-muted-foreground uppercase tracking-wider w-[140px]">Timestamp</th>
-                  <th className="py-3 px-4 text-left text-[10px] font-heading font-bold text-muted-foreground uppercase tracking-wider w-[140px]">HCS Proof</th>
+                  <th className="py-3 px-4 text-left text-[10px] font-heading font-bold text-muted-foreground uppercase tracking-wider w-[160px]">HCS Proof</th>
                   <th className="py-3 px-4 text-left text-[10px] font-heading font-bold text-muted-foreground uppercase tracking-wider w-[70px]">Score</th>
                 </tr>
               </thead>
@@ -115,6 +167,11 @@ const VerificationPage = () => {
                 {filtered.map((v: Verification) => {
                   const cfg = statusConfig[v.status] ?? statusConfig.pending;
                   const Icon = cfg.icon;
+                  const lv = v as LiveVerification;
+                  const hashscanUrl = lv.hashscanUrl
+                    ?? (v.hcsProof && v.hcsProof !== "pending" && v.hcsProof !== "N/A" && !isMockMode
+                      ? `https://hashscan.io/testnet/topic/${v.hcsProof.split("#")[0]}`
+                      : null);
                   return (
                     <tr key={v.id} className="border-b border-border last:border-0 hover:bg-accent/5 transition-colors">
                       <td className="py-3 px-4 font-mono text-xs text-foreground whitespace-nowrap">{v.shipmentId}</td>
@@ -128,7 +185,15 @@ const VerificationPage = () => {
                       <td className="py-3 px-4 text-[11px] font-mono text-muted-foreground whitespace-nowrap">{v.timestamp}</td>
                       <td className="py-3 px-4">
                         {v.hcsProof !== "pending" && v.hcsProof !== "N/A" ? (
-                          <span className="text-[11px] font-mono text-accent whitespace-nowrap truncate max-w-[120px] block">{v.hcsProof}</span>
+                          hashscanUrl ? (
+                            <a href={hashscanUrl} target="_blank" rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[11px] font-mono text-accent hover:underline truncate max-w-[130px]">
+                              <ExternalLink className="h-2.5 w-2.5 shrink-0" />
+                              <span className="truncate">{v.hcsProof}</span>
+                            </a>
+                          ) : (
+                            <span className="text-[11px] font-mono text-accent whitespace-nowrap truncate max-w-[120px] block">{v.hcsProof}</span>
+                          )
                         ) : (
                           <span className="text-[11px] text-muted-foreground">{v.hcsProof}</span>
                         )}
