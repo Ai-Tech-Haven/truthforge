@@ -5,6 +5,7 @@ import MetricCard from "@/components/MetricCard";
 import HeroValueSlider from "@/components/HeroValueSlider";
 import PortOverviewMap from "@/components/PortOverviewMap";
 import OperationalNetworkFooter from "@/components/OperationalNetworkFooter";
+import LiveVerificationFlow from "@/components/LiveVerificationFlow";
 import { mockMetrics } from "@/lib/mock-data";
 import { useMockMode } from "@/contexts/MockModeContext";
 import { apiFetch, MockModeError } from "@/lib/api-client";
@@ -121,6 +122,11 @@ const LandingPage = () => {
           <MetricCard icon={CheckCircle} label="Pre-Cleared" value={metrics.shipmentsPreCleared.toLocaleString()} variant="success" />
           <MetricCard icon={BarChart3} label="Shipments Today" value={metrics.shipmentsToday} variant="default" />
         </div>
+      </section>
+
+      {/* Live Verification Flow */}
+      <section aria-label="Live verification flow">
+        <LiveVerificationFlow />
       </section>
 
       {/* Portal CTAs — compact navy cards */}
