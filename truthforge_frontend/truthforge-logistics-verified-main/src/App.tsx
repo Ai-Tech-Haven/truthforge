@@ -22,6 +22,7 @@ import TrackingPage from "@/pages/TrackingPage";
 import VerificationPage from "@/pages/VerificationPage";
 import SettingsPage from "@/pages/SettingsPage";
 import DashboardPage from "@/pages/DashboardPage";
+import PrivacyPage from "@/pages/PrivacyPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,6 +41,7 @@ const AppShell = () => (
         <Route path="/verification" element={<VerificationPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/integrations/woocommerce" element={<SettingsPage />} />
         <Route path="/integrations/fedex" element={<SettingsPage />} />
         {/* Legacy tab-based paths redirect to new routes */}

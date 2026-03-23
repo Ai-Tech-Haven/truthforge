@@ -8,7 +8,7 @@ import logo from "@/assets/truthforge-logo.png";
 import {
   Database, Sun, Moon, ChevronDown, Anchor, BarChart3,
   FileText, Cpu, Plug, HelpCircle, Building2, Package,
-  Ship, X, BookOpen, Code, MessageSquare,
+  Ship, X, BookOpen, MessageSquare,
 } from "lucide-react";
 
 const RAILWAY = "https://web-production-dcd43.up.railway.app";
@@ -152,18 +152,24 @@ const HelpModal = ({ onClose }: { onClose: () => void }) => (
       </div>
       <div className="space-y-3">
         {[
-          { icon: BookOpen, label: "REST API Reference", desc: "Full API docs for backend integration" },
-          { icon: Code, label: "Agent SDK Guide", desc: "Build and register custom agents" },
-          { icon: Database, label: "HCS Data Schema", desc: "Hedera Consensus Service message formats" },
-          { icon: MessageSquare, label: "Support Chat", desc: "Talk to the TruthForge team" },
+          { icon: BookOpen, label: "REST API Reference", desc: "Full API docs for backend integration", soon: true },
+          { icon: Database, label: "HCS Data Schema", desc: "Hedera Consensus Service message formats", soon: true },
+          { icon: MessageSquare, label: "Support Chat", desc: "Talk to the TruthForge team", soon: false },
         ].map(item => (
           <div
             key={item.label}
             className="flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-secondary/50 transition-colors cursor-pointer"
           >
             <item.icon className="h-4 w-4 text-accent mt-0.5 shrink-0" />
-            <div>
-              <div className="text-sm font-medium text-foreground">{item.label}</div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <div className="text-sm font-medium text-foreground">{item.label}</div>
+                {item.soon && (
+                  <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border border-warning/40 text-warning bg-warning/10">
+                    Soon
+                  </span>
+                )}
+              </div>
               <div className="text-xs text-muted-foreground">{item.desc}</div>
             </div>
           </div>
@@ -260,7 +266,7 @@ const Header = () => {
             <img src={logo} alt="TruthForge" className="h-8 w-8 object-contain" />
             <div className="hidden sm:block">
               <h1 className="text-sm font-bold text-white leading-tight tracking-wide">TruthForge</h1>
-              <p className="text-[9px] text-slate-400 leading-none tracking-widest uppercase">The Verifiable Intelligence Layer</p>
+              <p className="text-[9px] text-slate-400 leading-none tracking-widest uppercase">The Verifiable Intelligence Layer for Global Trade</p>
             </div>
           </button>
 

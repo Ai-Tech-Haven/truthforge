@@ -32,27 +32,23 @@ const Footer = () => {
             </h3>
             <ul className="space-y-2">
               <li>
-                <Link
-                  to="/public"
-                  className="text-sm text-[hsl(210,20%,70%)] hover:text-[hsl(190,100%,50%)] transition-colors"
-                >
-                  Dashboard
+                <Link to="/tracking" className="text-sm text-[hsl(210,20%,70%)] hover:text-[hsl(190,100%,50%)] transition-colors">
+                  Operational Oversight
                 </Link>
               </li>
               <li>
-                <Link
-                  to="/public"
-                  className="text-sm text-[hsl(210,20%,70%)] hover:text-[hsl(190,100%,50%)] transition-colors"
-                >
-                  Port Operations
+                <Link to="/verification" className="text-sm text-[hsl(210,20%,70%)] hover:text-[hsl(190,100%,50%)] transition-colors">
+                  Verification
                 </Link>
               </li>
               <li>
-                <Link
-                  to="/public"
-                  className="text-sm text-[hsl(210,20%,70%)] hover:text-[hsl(190,100%,50%)] transition-colors"
-                >
-                  Supply Chain Intelligence
+                <Link to="/agents" className="text-sm text-[hsl(210,20%,70%)] hover:text-[hsl(190,100%,50%)] transition-colors">
+                  Agent Registry
+                </Link>
+              </li>
+              <li>
+                <Link to="/settings" className="text-sm text-[hsl(210,20%,70%)] hover:text-[hsl(190,100%,50%)] transition-colors">
+                  Settings
                 </Link>
               </li>
             </ul>
@@ -65,22 +61,9 @@ const Footer = () => {
             </h3>
             <ul className="space-y-2">
               <li>
-                <a
-                  href="#"
-                  className="text-sm text-[hsl(210,20%,70%)] hover:text-[hsl(190,100%,50%)] transition-colors"
-                  onClick={(e) => e.preventDefault()}
-                >
-                  Documentation
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#"
-                  className="text-sm text-[hsl(210,20%,70%)] hover:text-[hsl(190,100%,50%)] transition-colors"
-                  onClick={(e) => e.preventDefault()}
-                >
-                  Privacy
-                </a>
+                <Link to="/privacy" className="text-sm text-[hsl(210,20%,70%)] hover:text-[hsl(190,100%,50%)] transition-colors">
+                  Privacy Policy
+                </Link>
               </li>
             </ul>
           </div>
