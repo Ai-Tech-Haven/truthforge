@@ -770,59 +770,57 @@ def register_routes(app: Flask) -> None:
             
             # MOCK MODE
             mock_shipments = [
-                    {
-                        "id": "SHP-8821A",
-                        "carrier": "Maersk",
-                        "vessel": "Mumbai Maersk",
-                        "origin": "Shanghai, CN",
-                        "destination": "Los Angeles, US",
-                        "status": "Verified",
-                        "eta": "T-14h",
-                        "fedexTracking": "7749 1234 5678",
-                        "woocommerceOrder": "WC-10234"
-                    },
-                    {
-                        "id": "SHP-8822B", 
-                        "carrier": "MSC",
-                        "vessel": "MSC Oscar",
-                        "origin": "Rotterdam, NL",
-                        "destination": "New York, US",
-                        "status": "Pending Consensus",
-                        "eta": "T-18h",
-                        "woocommerceOrder": "WC-10235"
-                    },
-                    {
-                        "id": "SHP-8823C",
-                        "carrier": "CMA CGM", 
-                        "vessel": "Jade",
-                        "origin": "Tokyo, JP",
-                        "destination": "Chicago, US",
-                        "status": "Flagged Exception",
-                        "eta": "T-22h"
-                    },
-                    {
-                        "id": "SHP-8824D",
-                        "carrier": "FedEx",
-                        "vessel": "FX992 (Air)",
-                        "origin": "Mumbai, IN",
-                        "destination": "London, UK", 
-                        "status": "Verified",
-                        "eta": "T-04h"
-                    }
-                ]
-                
-                # Apply pagination
-                paginated_shipments = mock_shipments[offset:offset + limit]
-                
-                response = {
-                    "shipments": paginated_shipments,
-                    "total": len(mock_shipments),
-                    "limit": limit,
-                    "offset": offset,
-                    "live": False
+                {
+                    "id": "SHP-8821A",
+                    "carrier": "Maersk",
+                    "vessel": "Mumbai Maersk",
+                    "origin": "Shanghai, CN",
+                    "destination": "Los Angeles, US",
+                    "status": "Verified",
+                    "eta": "T-14h",
+                    "fedexTracking": "7749 1234 5678",
+                    "woocommerceOrder": "WC-10234"
+                },
+                {
+                    "id": "SHP-8822B",
+                    "carrier": "MSC",
+                    "vessel": "MSC Oscar",
+                    "origin": "Rotterdam, NL",
+                    "destination": "New York, US",
+                    "status": "Pending Consensus",
+                    "eta": "T-18h",
+                    "woocommerceOrder": "WC-10235"
+                },
+                {
+                    "id": "SHP-8823C",
+                    "carrier": "CMA CGM",
+                    "vessel": "Jade",
+                    "origin": "Tokyo, JP",
+                    "destination": "Chicago, US",
+                    "status": "Flagged Exception",
+                    "eta": "T-22h"
+                },
+                {
+                    "id": "SHP-8824D",
+                    "carrier": "FedEx",
+                    "vessel": "FX992 (Air)",
+                    "origin": "Mumbai, IN",
+                    "destination": "London, UK",
+                    "status": "Verified",
+                    "eta": "T-04h"
                 }
-            
-            return jsonify(response), 200
+            ]
+
+            # Apply pagination
+            paginated_shipments = mock_shipments[offset:offset + limit]
+
+            return jsonify({
+                "shipments": paginated_shipments,
+                "total": len(mock_shipments),
+                "limit": limit,
+                "offset": offset,
+                "live": False
+            }), 200
             
         except ValueError as e:
             return handle_error(
