@@ -752,16 +752,24 @@ def register_routes(app: Flask) -> None:
                         "shipments": shipment_list,
                         "total": total,
                         "limit": limit,
-                        "offset": offset
+                        "offset": offset,
+                        "live": True,
+                        "empty_reason": None if shipment_list else "No shipments in database yet"
                     }), 200
                 except Exception as e:
                     logger.error(f"Error fetching live shipments: {e}")
-                    # Fallback to mock
-                    pass
+                    # Return live-connected empty response — never fall back to mock
+                    return jsonify({
+                        "shipments": [],
+                        "total": 0,
+                        "limit": limit,
+                        "offset": offset,
+                        "live": True,
+                        "empty_reason": "Database unavailable — no shipments loaded yet"
+                    }), 200
             
-            if config.mock_mode:
-                # Return mock shipment data matching frontend structure
-                mock_shipments = [
+            # MOCK MODE
+            mock_shipments = [
                     {
                         "id": "SHP-8821A",
                         "carrier": "Maersk",
@@ -810,15 +818,8 @@ def register_routes(app: Flask) -> None:
                     "shipments": paginated_shipments,
                     "total": len(mock_shipments),
                     "limit": limit,
-                    "offset": offset
-                }
-            else:
-                # Use mock data for now since database queries need to be updated
-                response = {
-                    "shipments": [],
-                    "total": 0,
-                    "limit": limit,
-                    "offset": offset
+                    "offset": offset,
+                    "live": False
                 }
             
             return jsonify(response), 200
@@ -849,64 +850,86 @@ def register_routes(app: Flask) -> None:
             limit = int(request.args.get('limit', 50))
             offset = int(request.args.get('offset', 0))
             
-            if config.mock_mode:
-                # Return mock port trust receipt data
-                mock_receipts = [
-                    {
-                        "id": "PTR-001",
-                        "shipmentId": "SHP-8821A",
-                        "clearanceStatus": "cleared",
-                        "agentSignatures": [
-                            {"agentName": "Orchestrator Agent", "agentId": "truthforge-orch-001"},
-                            {"agentName": "Verification & Compliance Agent", "agentId": "truthforge-verify-001"},
-                            {"agentName": "Carrier Adapter Agent (Council-Grade)", "agentId": "truthforge-carrier-001"},
-                            {"agentName": "Registry & Discovery Agent", "agentId": "truthforge-registry-001"},
-                            {"agentName": "Evidence & Settlement Agent", "agentId": "truthforge-evidence-001"}
-                        ],
-                        "hederaTxRef": "0.0.453211@1698754321.123456789",
-                        "issuedAt": "2024-01-15 14:35:00",
-                        "vessel": "Mumbai Maersk",
-                        "port": "Port of Los Angeles"
-                    },
-                    {
-                        "id": "PTR-002",
-                        "shipmentId": "SHP-8824D",
-                        "clearanceStatus": "cleared",
-                        "agentSignatures": [
-                            {"agentName": "Orchestrator Agent", "agentId": "truthforge-orch-001"},
-                            {"agentName": "Verification & Compliance Agent", "agentId": "truthforge-verify-001"},
-                            {"agentName": "Evidence & Settlement Agent", "agentId": "truthforge-evidence-001"}
-                        ],
-                        "hederaTxRef": "0.0.453211@1698754400.987654321",
-                        "issuedAt": "2024-01-14 09:12:00",
-                        "vessel": "FX992 (Air)",
-                        "port": "Port of Felixstowe"
-                    }
-                ]
-                
-                # Filter by shipment ID if provided
-                if shipment_id:
-                    mock_receipts = [r for r in mock_receipts if r["shipmentId"] == shipment_id]
-                
-                # Apply pagination
-                paginated_receipts = mock_receipts[offset:offset + limit]
-                
-                response = {
-                    "receipts": paginated_receipts,
-                    "total": len(mock_receipts),
-                    "limit": limit,
-                    "offset": offset
+            if not config.mock_mode:
+                # LIVE MODE: query DB for real receipts
+                try:
+                    receipts_list: list = []
+                    try:
+                        from database import models
+                        from database.database import db_session
+                        if hasattr(models, 'PortTrustReceipt'):
+                            q = db_session.query(models.PortTrustReceipt)
+                            if shipment_id:
+                                q = q.filter(models.PortTrustReceipt.shipment_id == shipment_id)
+                            rows = q.offset(offset).limit(limit).all()
+                            receipts_list = [r.to_dict() for r in rows if hasattr(r, 'to_dict')]
+                    except Exception:
+                        pass  # table doesn't exist yet
+
+                    return jsonify({
+                        "receipts": receipts_list,
+                        "total": len(receipts_list),
+                        "limit": limit,
+                        "offset": offset,
+                        "live": True,
+                        "empty_reason": None if receipts_list else "No trust receipts issued yet"
+                    }), 200
+                except Exception as e:
+                    logger.error(f"Error fetching live receipts: {e}")
+                    return jsonify({
+                        "receipts": [],
+                        "total": 0,
+                        "limit": limit,
+                        "offset": offset,
+                        "live": True,
+                        "empty_reason": "Database unavailable"
+                    }), 200
+
+            # MOCK MODE
+            mock_receipts = [
+                {
+                    "id": "PTR-001",
+                    "shipmentId": "SHP-8821A",
+                    "clearanceStatus": "cleared",
+                    "agentSignatures": [
+                        {"agentName": "Orchestrator Agent", "agentId": "truthforge-orch-001"},
+                        {"agentName": "Verification & Compliance Agent", "agentId": "truthforge-verify-001"},
+                        {"agentName": "Carrier Adapter Agent (Council-Grade)", "agentId": "truthforge-carrier-001"},
+                        {"agentName": "Registry & Discovery Agent", "agentId": "truthforge-registry-001"},
+                        {"agentName": "Evidence & Settlement Agent", "agentId": "truthforge-evidence-001"}
+                    ],
+                    "hederaTxRef": "0.0.453211@1698754321.123456789",
+                    "issuedAt": "2024-01-15 14:35:00",
+                    "vessel": "Mumbai Maersk",
+                    "port": "Port of Los Angeles"
+                },
+                {
+                    "id": "PTR-002",
+                    "shipmentId": "SHP-8824D",
+                    "clearanceStatus": "cleared",
+                    "agentSignatures": [
+                        {"agentName": "Orchestrator Agent", "agentId": "truthforge-orch-001"},
+                        {"agentName": "Verification & Compliance Agent", "agentId": "truthforge-verify-001"},
+                        {"agentName": "Evidence & Settlement Agent", "agentId": "truthforge-evidence-001"}
+                    ],
+                    "hederaTxRef": "0.0.453211@1698754400.987654321",
+                    "issuedAt": "2024-01-14 09:12:00",
+                    "vessel": "FX992 (Air)",
+                    "port": "Port of Felixstowe"
                 }
-            else:
-                # Use mock data for now since database queries need to be updated
-                response = {
-                    "receipts": [],
-                    "total": 0,
-                    "limit": limit,
-                    "offset": offset
-                }
-            
-            return jsonify(response), 200
+            ]
+
+            if shipment_id:
+                mock_receipts = [r for r in mock_receipts if r["shipmentId"] == shipment_id]
+
+            paginated_receipts = mock_receipts[offset:offset + limit]
+            return jsonify({
+                "receipts": paginated_receipts,
+                "total": len(mock_receipts),
+                "limit": limit,
+                "offset": offset,
+                "live": False
+            }), 200
             
         except ValueError as e:
             return handle_error(
