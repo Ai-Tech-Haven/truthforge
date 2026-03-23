@@ -220,7 +220,6 @@ const Header = () => {
 
   const dashboardItems: DropdownItem[] = [
     { path: "/tracking", label: "Operational Oversight", icon: BarChart3 },
-    { path: "/dashboard", label: "Analytics", icon: BarChart3 },
     { path: "/verification", label: "Verification", icon: FileText },
     { path: "/reports", label: "Reports", icon: FileText, disabled: true, badge: "Soon" },
   ];

@@ -55,9 +55,12 @@ const AgentsPage = () => {
     }
     if (!isBackground) setLoading(true);
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
       const res = await fetch(`${RAILWAY}/api/agents`, {
-        signal: AbortSignal.timeout(8000),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json() as { agents: LiveAgent[] };
       const mapped = (data.agents || []).map(mapLiveAgent);
@@ -66,8 +69,10 @@ const AgentsPage = () => {
       setLastSync(new Date().toLocaleTimeString());
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      setError(`Backend unreachable — ${msg}`);
-      // keep last known data, don't fall back to mock
+      const isTimeout = msg.includes("abort") || msg.includes("timeout") || msg.includes("signal");
+      setError(`Backend unreachable — ${isTimeout ? "request timed out" : msg}`);
+      // Fall back to mock agents so the page is still useful
+      setAgents(prev => prev.length > 0 ? prev : mockAgents);
     } finally {
       if (!isBackground) setLoading(false);
     }
