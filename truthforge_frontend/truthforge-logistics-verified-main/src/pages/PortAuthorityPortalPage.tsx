@@ -62,7 +62,7 @@ const PortAuthorityPortalPage = () => {
   const [transportMode, setTransportMode]       = useState<TransportMode>("sea");
   const [expandedRow, setExpandedRow]           = useState<string | null>(null);
   const [shipmentStatuses, setShipmentStatuses] = useState<Record<string, string>>({});
-  const [selectedReceipt, setSelectedReceipt]   = useState<string | null>(null);
+  const [receiptShipmentId, setReceiptShipmentId] = useState<string | null>(null);
   const [portOpen, setPortOpen]                 = useState(false);
   const [liveShipments, setLiveShipments]       = useState<ShipmentTracking[]>([]);
   const [liveReceipts, setLiveReceipts]         = useState<PortTrustReceiptType[]>([]);
@@ -115,7 +115,7 @@ const PortAuthorityPortalPage = () => {
     toast({ title: "Shipment Approved", description: `${id} approved for clearance.` });
   };
 
-  const openReceipt = receipts.find((r) => r.id === selectedReceipt);
+  const receiptForModal = receipts.find((r) => r.shipmentId === receiptShipmentId);
   const portLabel   = PORTS.find((p) => p.code === selectedPort)?.label ?? "Lagos";
   const labels      = modeLabels[transportMode];
 
@@ -276,7 +276,7 @@ const PortAuthorityPortalPage = () => {
                           <CheckCircle className="h-3 w-3" />Approve
                         </button>
                         {receipt && (
-                          <button onClick={() => setSelectedReceipt(receipt.id)}
+                          <button onClick={() => setReceiptShipmentId(s.id)}
                             className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
                             aria-label={`View receipt for ${s.id}`}>
                             <Shield className="h-3 w-3" />Receipt
@@ -389,7 +389,7 @@ const PortAuthorityPortalPage = () => {
                               )}
                             </div>
                           </div>
-                          <button onClick={() => setSelectedReceipt(receipt.id)} className="mt-2 text-[10px] font-medium text-accent hover:underline">
+                          <button onClick={() => setReceiptShipmentId(s.id)} className="mt-2 text-[10px] font-medium text-accent hover:underline">
                             View full receipt
                           </button>
                         </div>
@@ -403,16 +403,16 @@ const PortAuthorityPortalPage = () => {
         )}
       </div>
 
-      {openReceipt && (
+      {receiptShipmentId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-label="Port Trust Receipt">
           <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl bg-card border border-border shadow-xl">
-            <button onClick={() => setSelectedReceipt(null)}
+            <button onClick={() => setReceiptShipmentId(null)}
               className="absolute top-4 right-4 p-1 rounded hover:bg-accent/10 text-muted-foreground hover:text-foreground transition-colors"
               aria-label="Close receipt">
               <X className="h-5 w-5" />
             </button>
             <div className="p-6">
-              <PortTrustReceipt receipt={openReceipt} />
+              <PortTrustReceipt receipt={receiptForModal!} />
             </div>
           </div>
         </div>
