@@ -438,13 +438,17 @@ def create_wsgi_app():
     _registry = HOLRegistry()
 
     # Minimal orchestrator stub so Flask can start without Hedera auth
+    # Use MockHederaClient to satisfy BaseAgent's hedera_client requirement
+    # without making any real network calls during startup
+    _mock_hedera = MockHederaClient(_cfg)
+    _mock_hedera.authenticated = True  # skip authenticate() call
     from agents.orchestrator_agent import OrchestratorAgent as _Orch
     _orch = _Orch(
         agent_id=os.getenv("AGENT_01_ID", "truthforge-orch-001"),
         capabilities=["workflow_coordination"],
         hcs_topic_id=_cfg.hcs_topic_id,
         config=_cfg,
-        hedera_client=None,
+        hedera_client=_mock_hedera,
     )
 
     flask_app = create_app(
