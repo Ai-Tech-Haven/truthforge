@@ -2,6 +2,7 @@ export interface Agent {
   id: string;
   name: string;
   agentId: string;
+  uaid?: string;
   hcsTopic: string;
   status: "online" | "offline" | "processing";
   health: number;
@@ -98,11 +99,11 @@ export interface PortTrustReceipt {
 }
 
 export const mockAgents: Agent[] = [
-  { id: "agent-001", name: "Orchestrator Agent", agentId: "truthforge-orch-001", hcsTopic: "hcs-orch-001", status: "online", health: 98, lastActive: "2 min ago", primaryFunction: "Workflow coordination and decision execution" },
-  { id: "agent-002", name: "Verification & Compliance Agent", agentId: "truthforge-verify-001", hcsTopic: "hcs-verify-001", status: "online", health: 95, lastActive: "30 sec ago", primaryFunction: "Document validation and compliance assessment" },
-  { id: "agent-003", name: "Carrier Adapter Agent (Council-Grade)", agentId: "truthforge-carrier-001", hcsTopic: "hcs-carrier-001", status: "online", health: 99, lastActive: "1 min ago", primaryFunction: "Carrier data ingestion and normalization" },
-  { id: "agent-004", name: "Registry & Discovery Agent", agentId: "truthforge-registry-001", hcsTopic: "hcs-registry-001", status: "online", health: 92, lastActive: "45 sec ago", primaryFunction: "Agent discovery, health reporting, registry sync" },
-  { id: "agent-005", name: "Evidence & Settlement Agent", agentId: "truthforge-evidence-001", hcsTopic: "hcs-evidence-001", status: "online", health: 97, lastActive: "Active now", primaryFunction: "Consensus submission and audit reference generation" },
+  { id: "agent-001", name: "Orchestrator Agent",                    agentId: "truthforge-orch-001",     uaid: "uaid_truthforge-orch-001_1773222776004",     hcsTopic: "0.0.8161244", status: "online", health: 98, lastActive: "2 min ago",   primaryFunction: "Workflow coordination and decision execution" },
+  { id: "agent-002", name: "Verification & Compliance Agent",       agentId: "truthforge-verify-001",   uaid: "uaid_truthforge-verify-001_1773222780506",   hcsTopic: "0.0.8161247", status: "online", health: 95, lastActive: "30 sec ago",  primaryFunction: "Document validation and compliance assessment" },
+  { id: "agent-003", name: "Carrier Adapter Agent (Council-Grade)", agentId: "truthforge-carrier-001",  uaid: "uaid_truthforge-carrier-001_1773222782923",  hcsTopic: "0.0.8161248", status: "online", health: 99, lastActive: "1 min ago",   primaryFunction: "Carrier data ingestion and normalization" },
+  { id: "agent-004", name: "Registry & Discovery Agent",            agentId: "truthforge-registry-001", uaid: "uaid_truthforge-registry-001_1773222785931", hcsTopic: "0.0.8161249", status: "online", health: 92, lastActive: "45 sec ago",  primaryFunction: "Agent discovery, health reporting, registry sync" },
+  { id: "agent-005", name: "Evidence & Settlement Agent",           agentId: "truthforge-evidence-001", uaid: "uaid_truthforge-evidence-001_1773222788235", hcsTopic: "0.0.8161250", status: "online", health: 97, lastActive: "Active now",   primaryFunction: "Consensus submission and audit reference generation" },
 ];
 
 export const mockVerifications: Verification[] = [

@@ -207,62 +207,84 @@ class TruthForgeSystem:
     
     def _register_agents(self) -> None:
         """Register all agents with HOL registry and database."""
+        import os
         from database.services import AgentService
         
-        agent_configs = {
+        # Real per-agent data from environment (set during HOL registration)
+        agent_env_data = {
             'orchestrator': {
                 'name': 'Orchestrator Agent',
+                'agent_id': os.getenv('AGENT_01_ID', 'truthforge-orch-001'),
+                'uaid': os.getenv('AGENT_01_UAID', ''),
+                'hcs_topic': os.getenv('AGENT_01_HCS_TOPIC', ''),
                 'capabilities': ['workflow_coordination', 'decision_execution', 'agent_routing']
             },
             'verification_compliance': {
                 'name': 'Verification & Compliance Agent',
+                'agent_id': os.getenv('AGENT_02_ID', 'truthforge-verify-001'),
+                'uaid': os.getenv('AGENT_02_UAID', ''),
+                'hcs_topic': os.getenv('AGENT_02_HCS_TOPIC', ''),
                 'capabilities': ['document_validation', 'compliance_assessment', 'deepfake_detection']
             },
             'carrier_adapter': {
                 'name': 'Carrier Adapter Agent (Council-Grade)',
+                'agent_id': os.getenv('AGENT_03_ID', 'truthforge-carrier-001'),
+                'uaid': os.getenv('AGENT_03_UAID', ''),
+                'hcs_topic': os.getenv('AGENT_03_HCS_TOPIC', ''),
                 'capabilities': ['carrier_data_ingestion', 'data_normalization', 'multi_carrier_support']
             },
             'registry_discovery': {
                 'name': 'Registry & Discovery Agent',
+                'agent_id': os.getenv('AGENT_04_ID', 'truthforge-registry-001'),
+                'uaid': os.getenv('AGENT_04_UAID', ''),
+                'hcs_topic': os.getenv('AGENT_04_HCS_TOPIC', ''),
                 'capabilities': ['agent_discovery', 'health_reporting', 'registry_sync']
             },
             'evidence_settlement': {
                 'name': 'Evidence & Settlement Agent',
+                'agent_id': os.getenv('AGENT_05_ID', 'truthforge-evidence-001'),
+                'uaid': os.getenv('AGENT_05_UAID', ''),
+                'hcs_topic': os.getenv('AGENT_05_HCS_TOPIC', ''),
                 'capabilities': ['consensus_submission', 'audit_reference_generation', 'settlement_processing']
             }
         }
         
         for agent_name, agent in self.agents.items():
             try:
-                # Register with HOL
-                success = agent.register_with_hol()
-                if success:
-                    logger.info(f"Successfully registered {agent.agent_id} with HOL")
-                else:
-                    logger.error(f"Failed to register {agent.agent_id} with HOL")
-                
-                # Register in database (live mode only)
+                env = agent_env_data.get(agent_name, {})
+                # Use per-agent HCS topic from env if available, else fall back to global
+                per_agent_hcs = env.get('hcs_topic') or agent.hcs_topic_id
+
+                # Register with HOL (in-memory registry)
+                self.hol_registry.register_agent(
+                    agent_id=env.get('agent_id', agent.agent_id),
+                    capabilities=env.get('capabilities', []),
+                    hcs_topic_id=per_agent_hcs,
+                    metadata={'uaid': env.get('uaid', '')}
+                )
+                logger.info(f"Registered {agent.agent_id} with HOL (topic={per_agent_hcs})")
+
+                # Upsert into database (live mode only)
                 if not self.config.mock_mode:
                     try:
-                        config = agent_configs.get(agent_name, {})
                         AgentService.upsert_agent(
-                            agent_id=agent.agent_id,
-                            agent_name=config.get('name', agent.agent_id),
+                            agent_id=env.get('agent_id', agent.agent_id),
+                            agent_name=env.get('name', agent.agent_id),
                             status='online',
-                            hol_uaid=getattr(agent, 'hol_uaid', None),
-                            hcs_topic_id=agent.hcs_topic_id,
-                            capabilities=config.get('capabilities', [])
+                            hol_uaid=env.get('uaid') or None,
+                            hcs_topic_id=per_agent_hcs,
+                            capabilities=env.get('capabilities', [])
                         )
-                        logger.info(f"Registered {agent.agent_id} in database")
+                        logger.info(f"Upserted {agent.agent_id} in database (uaid={env.get('uaid', 'N/A')})")
                     except Exception as e:
-                        logger.error(f"Error registering {agent.agent_id} in database: {e}")
-                
+                        logger.error(f"Error upserting {agent.agent_id} in database: {e}")
+
             except Exception as e:
                 logger.error(f"Error registering {agent.agent_id}: {e}")
         
         # Verify all 5 agents are registered
         registered_count = self.hol_registry.count_agents()
-        if registered_count == 5:
+        if registered_count >= 5:
             logger.info(f"All 5 agents successfully registered with HOL")
         else:
             logger.warning(f"Expected 5 agents, but {registered_count} are registered")

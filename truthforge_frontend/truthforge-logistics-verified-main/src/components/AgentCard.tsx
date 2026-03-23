@@ -44,6 +44,14 @@ const AgentCard = ({ agent, navy = false }: AgentCardProps) => (
         <span className={navy ? "text-[#8ab4d4]" : "text-muted-foreground"}>Agent ID</span>
         <span className={`font-mono ${navy ? "text-[#c8e0f4]" : "text-foreground"}`}>{agent.agentId}</span>
       </div>
+      {agent.uaid && (
+        <div className="flex justify-between gap-2">
+          <span className={`shrink-0 ${navy ? "text-[#8ab4d4]" : "text-muted-foreground"}`}>UAID</span>
+          <span className={`font-mono text-right truncate max-w-[65%] ${navy ? "text-[#4a9eff]" : "text-accent"}`} title={agent.uaid}>
+            {agent.uaid}
+          </span>
+        </div>
+      )}
       <div className="flex justify-between">
         <span className={navy ? "text-[#8ab4d4]" : "text-muted-foreground"}>HCS Topic</span>
         <span className={`font-mono ${navy ? "text-[#4a9eff]" : "text-foreground"}`}>{agent.hcsTopic}</span>

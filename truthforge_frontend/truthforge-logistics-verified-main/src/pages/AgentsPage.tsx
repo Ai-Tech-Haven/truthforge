@@ -19,6 +19,7 @@ interface LiveAgent {
   id: string;
   name: string;
   agentId: string;
+  uaid?: string;
   primaryFunction: string;
   hcsTopic: string;
   status: string;
@@ -32,6 +33,7 @@ function mapLiveAgent(a: LiveAgent): Agent {
     id: a.id,
     name: a.name,
     agentId: a.agentId,
+    uaid: a.uaid || "",
     hcsTopic: a.hcsTopic || "—",
     status: (a.status === "online" ? "online" : a.status === "processing" ? "processing" : "offline") as Agent["status"],
     health: typeof a.health === "number" ? a.health : 95,
@@ -64,15 +66,18 @@ const AgentsPage = () => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json() as { agents: LiveAgent[] };
       const mapped = (data.agents || []).map(mapLiveAgent);
-      setAgents(mapped.length > 0 ? mapped : mockAgents);
-      setError(null);
-      setLastSync(new Date().toLocaleTimeString());
+      if (mapped.length > 0) {
+        setAgents(mapped);
+        setError(null);
+        setLastSync(new Date().toLocaleTimeString());
+      } else {
+        setError("Backend returned no agents — check Railway deployment");
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       const isTimeout = msg.includes("abort") || msg.includes("timeout") || msg.includes("signal");
       setError(`Backend unreachable — ${isTimeout ? "request timed out" : msg}`);
-      // Fall back to mock agents so the page is still useful
-      setAgents(prev => prev.length > 0 ? prev : mockAgents);
+      // In live mode keep last known data (don't overwrite with mock)
     } finally {
       if (!isBackground) setLoading(false);
     }
