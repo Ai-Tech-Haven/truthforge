@@ -421,14 +421,52 @@ def main():
 def create_wsgi_app():
     """
     Create and return the WSGI app for gunicorn.
-    Boots the full TruthForge system and returns the Flask app.
+    Heavy initialization (Hedera auth, agent registration) runs in a
+    background thread so gunicorn workers start serving immediately.
     """
-    system = TruthForgeSystem()
-    if not system.initialize():
-        logger.error("TruthForge system failed to initialize â€” exiting")
-        sys.exit(1)
-    system.running = True
-    return system.flask_app
+    import threading
+    import os
+
+    # Fast path: build Flask app with minimal deps so gunicorn starts immediately
+    try:
+        from database.database import init_db as _init_db
+        _init_db()
+    except Exception as e:
+        logger.warning(f"DB init skipped at startup: {e}")
+
+    _cfg = Config.load()
+    _registry = HOLRegistry()
+
+    # Minimal orchestrator stub so Flask can start without Hedera auth
+    from agents.orchestrator_agent import OrchestratorAgent as _Orch
+    _orch = _Orch(
+        agent_id=os.getenv("AGENT_01_ID", "truthforge-orch-001"),
+        capabilities=["workflow_coordination"],
+        hcs_topic_id=_cfg.hcs_topic_id,
+        config=_cfg,
+        hedera_client=None,
+    )
+
+    flask_app = create_app(
+        app_config=_cfg,
+        orchestrator=_orch,
+        hol_registry=_registry,
+    )
+
+    # Slow path: full system init (Hedera auth, agent DB upsert) in background
+    def _full_init():
+        try:
+            system = TruthForgeSystem()
+            if system.initialize():
+                system.running = True
+                logger.info("Full TruthForge system initialized in background")
+            else:
+                logger.error("Background TruthForge initialization failed")
+        except Exception as e:
+            logger.error(f"Background init error: {e}")
+
+    threading.Thread(target=_full_init, daemon=True).start()
+    return flask_app
 
 
 # Module-level app for gunicorn: `gunicorn main:app`

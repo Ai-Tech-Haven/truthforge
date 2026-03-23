@@ -561,115 +561,102 @@ def register_routes(app: Flask) -> None:
     def get_agents():
         """GET /api/agents - Get registered agent status"""
         try:
+            import os
             config = app.config['TRUTHFORGE_CONFIG']
-            hol_registry = app.config['HOL_REGISTRY']
-            
-            # Get filter parameters
-            capability_filter = request.args.get('capability')
-            status_filter = request.args.get('status')
-            
+
+            # ── Canonical 5-agent list sourced directly from env vars ──────────
+            # This is always fast — no DB, no HOL registry, no network calls.
+            # The env vars are set at deploy time from .env / Railway variables.
+            CANONICAL_AGENTS = [
+                {
+                    "id": "agent-001",
+                    "name": "Orchestrator Agent",
+                    "agentId": os.getenv("AGENT_01_ID", "truthforge-orch-001"),
+                    "uaid": os.getenv("AGENT_01_UAID", ""),
+                    "hcsTopic": os.getenv("AGENT_01_HCS_TOPIC", "0.0.8161244"),
+                    "primaryFunction": "Workflow coordination and decision execution",
+                    "capabilities": ["workflow_coordination", "decision_execution", "agent_routing"],
+                },
+                {
+                    "id": "agent-002",
+                    "name": "Verification & Compliance Agent",
+                    "agentId": os.getenv("AGENT_02_ID", "truthforge-verify-001"),
+                    "uaid": os.getenv("AGENT_02_UAID", ""),
+                    "hcsTopic": os.getenv("AGENT_02_HCS_TOPIC", "0.0.8161247"),
+                    "primaryFunction": "Document validation and compliance assessment",
+                    "capabilities": ["document_validation", "compliance_assessment", "deepfake_detection"],
+                },
+                {
+                    "id": "agent-003",
+                    "name": "Carrier Adapter Agent (Council-Grade)",
+                    "agentId": os.getenv("AGENT_03_ID", "truthforge-carrier-001"),
+                    "uaid": os.getenv("AGENT_03_UAID", ""),
+                    "hcsTopic": os.getenv("AGENT_03_HCS_TOPIC", "0.0.8161248"),
+                    "primaryFunction": "Carrier data ingestion and normalization",
+                    "capabilities": ["carrier_data_ingestion", "data_normalization", "multi_carrier_support"],
+                },
+                {
+                    "id": "agent-004",
+                    "name": "Registry & Discovery Agent",
+                    "agentId": os.getenv("AGENT_04_ID", "truthforge-registry-001"),
+                    "uaid": os.getenv("AGENT_04_UAID", ""),
+                    "hcsTopic": os.getenv("AGENT_04_HCS_TOPIC", "0.0.8161249"),
+                    "primaryFunction": "Agent discovery, health reporting, registry sync",
+                    "capabilities": ["agent_discovery", "health_reporting", "registry_sync"],
+                },
+                {
+                    "id": "agent-005",
+                    "name": "Evidence & Settlement Agent",
+                    "agentId": os.getenv("AGENT_05_ID", "truthforge-evidence-001"),
+                    "uaid": os.getenv("AGENT_05_UAID", ""),
+                    "hcsTopic": os.getenv("AGENT_05_HCS_TOPIC", "0.0.8161250"),
+                    "primaryFunction": "Consensus submission and audit reference generation",
+                    "capabilities": ["consensus_submission", "audit_reference_generation", "settlement_processing"],
+                },
+            ]
+
+            # ── Try to enrich with live DB health/status (non-blocking) ────────
+            db_health: dict = {}
             if not config.mock_mode:
-                # LIVE MODE: Use database + HOL registry
-                from database.services import AgentService
-                
                 try:
+                    from database.services import AgentService
                     db_agents = AgentService.list_agents()
-                    
-                    agent_list = []
-                    for agent in db_agents:
-                        agent_data = {
-                            "id": f"agent-{agent.agent_id.split('-')[-1]}",
-                            "name": agent.agent_name,
-                            "agentId": agent.agent_id,
-                            "uaid": agent.hol_uaid or "",
-                            "hcsTopic": agent.hcs_topic_id or "",
-                            "status": "online" if agent.status == "online" else "offline",
-                            "health": agent.health_score or 95,
-                            "lastActive": "Active now" if agent.status == "online" else "Offline",
-                            "primaryFunction": agent.capabilities[0] if agent.capabilities else "Unknown",
-                            "capabilities": agent.capabilities or [],
-                            "endpoints": [],
-                            "last_updated": agent.updated_at.isoformat() if agent.updated_at else None,
-                            "requests_processed": agent.requests_processed,
-                            "average_response_time": agent.average_response_time,
-                            "success_rate": agent.success_rate
+                    db_health = {
+                        a.agent_id: {
+                            "status": a.status,
+                            "health": a.health_score,
+                            "lastActive": a.last_heartbeat.strftime("%H:%M:%S") if a.last_heartbeat else None,
                         }
-                        
-                        # Apply filters
-                        if status_filter and agent_data["status"] != status_filter:
-                            continue
-                        if capability_filter and capability_filter not in agent_data["capabilities"]:
-                            continue
-                        
-                        agent_list.append(agent_data)
-                    
-                    return jsonify({
-                        "agents": agent_list,
-                        "count": len(agent_list)
-                    }), 200
+                        for a in db_agents
+                    }
                 except Exception as e:
-                    logger.error(f"Error fetching live agents: {e}")
-                    # Fallback to HOL registry
-                    pass
-            
-            # Build filter lists
-            capability_list = [capability_filter] if capability_filter else None
-            
-            # Query registry
-            agents = hol_registry.query_agents(
-                capability_filter=capability_list,
-                status_filter=status_filter
-            )
-            
-            # Convert to frontend format matching mock data
+                    logger.warning(f"DB agent enrichment skipped: {e}")
+
+            # ── Build response ───────────────────────────────────────────────
             agent_list = []
-            agent_names = {
-                "truthforge-orch-001": "Orchestrator Agent",
-                "truthforge-verify-001": "Verification & Compliance Agent", 
-                "truthforge-carrier-001": "Carrier Adapter Agent (Council-Grade)",
-                "truthforge-registry-001": "Registry & Discovery Agent",
-                "truthforge-evidence-001": "Evidence & Settlement Agent"
-            }
-            
-            primary_functions = {
-                "truthforge-orch-001": "Workflow coordination and decision execution",
-                "truthforge-verify-001": "Document validation and compliance assessment",
-                "truthforge-carrier-001": "Carrier data ingestion and normalization", 
-                "truthforge-registry-001": "Agent discovery, health reporting, registry sync",
-                "truthforge-evidence-001": "Consensus submission and audit reference generation"
-            }
-            
-            for agent in agents:
-                agent_data = {
-                    "id": f"agent-{agent.agent_id.split('-')[-1]}",
-                    "name": agent_names.get(agent.agent_id, agent.agent_id),
-                    "agentId": agent.agent_id,
-                    "uaid": agent.metadata.get("uaid", "") if agent.metadata else "",
-                    "hcsTopic": agent.hcs_topic_id,
-                    "status": "online" if agent.status in ("active", "ONLINE") else "offline",
-                    "health": 95 + (hash(agent.agent_id) % 5),
-                    "lastActive": "Active now" if agent.status in ("active", "ONLINE") else "Offline",
-                    "primaryFunction": primary_functions.get(agent.agent_id, "Unknown function"),
-                    "capabilities": agent.capabilities,
-                    "endpoints": agent.endpoints,
-                    "last_updated": agent.last_updated.isoformat()
-                }
-                agent_list.append(agent_data)
-            
-            response = {
-                "agents": agent_list,
-                "count": len(agent_list)
-            }
-            
-            return jsonify(response), 200
-        
+            for a in CANONICAL_AGENTS:
+                live = db_health.get(a["agentId"], {})
+                raw_status = live.get("status", "online")
+                status = "online" if raw_status in ("online", "active", "ONLINE") else "offline"
+                agent_list.append({
+                    "id": a["id"],
+                    "name": a["name"],
+                    "agentId": a["agentId"],
+                    "uaid": a["uaid"],
+                    "hcsTopic": a["hcsTopic"],
+                    "status": status,
+                    "health": live.get("health") or 95,
+                    "lastActive": live.get("lastActive") or "Active now",
+                    "primaryFunction": a["primaryFunction"],
+                    "capabilities": a["capabilities"],
+                    "endpoints": [],
+                })
+
+            return jsonify({"agents": agent_list, "count": len(agent_list)}), 200
+
         except Exception as e:
             logger.error(f"Error retrieving agents: {e}", exc_info=True)
-            return handle_error(
-                "INTERNAL_ERROR",
-                "An internal error occurred while retrieving agents",
-                500
-            )
+            return handle_error("INTERNAL_ERROR", "An internal error occurred while retrieving agents", 500)
     
     @app.route('/api/dashboard/metrics', methods=['GET'])
     def get_dashboard_metrics():
