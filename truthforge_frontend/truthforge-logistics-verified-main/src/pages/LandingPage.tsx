@@ -1,7 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Clock, FileCheck, CheckCircle, BarChart3, Package, Ship, Anchor, ArrowRight } from "lucide-react";
-import MetricCard from "@/components/MetricCard";
+import { Package, Ship, Anchor, ArrowRight } from "lucide-react";
 import HeroValueSlider from "@/components/HeroValueSlider";
 import PortOverviewMap from "@/components/PortOverviewMap";
 import OperationalNetworkFooter from "@/components/OperationalNetworkFooter";
@@ -111,17 +110,6 @@ const LandingPage = () => {
         <p className="text-sm text-muted-foreground leading-relaxed max-w-3xl">
           TruthForge is a verifiable intelligence layer for global trade logistics. It uses Hedera Consensus Service (HCS) and a network of AI agents to verify shipment documents, issue port trust receipts, and enable pre-arrival clearance — reducing port dwell time and compliance risk for merchants, carriers, and port authorities.
         </p>
-      </section>
-
-      {/* Metrics */}
-      <section aria-label="Operational metrics">
-        <h3 className="text-sm font-heading font-bold text-muted-foreground uppercase tracking-wider mb-4">Operational Summary</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <MetricCard icon={Clock} label="Avg Clearance" value={metrics.avgClearanceTime} variant="accent" />
-          <MetricCard icon={FileCheck} label="Docs Pre-Arrival" value={metrics.documentsPreArrival.toLocaleString()} variant="default" />
-          <MetricCard icon={CheckCircle} label="Pre-Cleared" value={metrics.shipmentsPreCleared.toLocaleString()} variant="success" />
-          <MetricCard icon={BarChart3} label="Shipments Today" value={metrics.shipmentsToday} variant="default" />
-        </div>
       </section>
 
       {/* Live Verification Flow */}
