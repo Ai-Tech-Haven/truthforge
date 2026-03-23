@@ -30,7 +30,7 @@ When a ship carrying cargo approaches a port, customs officers have to manually 
 
 | | URL |
 |---|---|
-| 📢 Pitch Deck | 
+| 📢 Pitch Deck | [Pitch Deck](TruthForge%20-%20The%20Verifiable%20Intelligence%20Layer%20for%20Global%20Trade.pdf) |
 | 🌐 Frontend Dashboard | https://truthforge-seven.vercel.app |
 | ⚙️ Backend API | https://web-production-dcd43.up.railway.app |
 | 🔗 Agent Registry on Hedera | https://hashscan.io/testnet/topic/0.0.8161249 |
